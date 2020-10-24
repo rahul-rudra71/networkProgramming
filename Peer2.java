@@ -9,10 +9,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
-public class Peer {
+public class Peer2 {
 
     //this is just for testing we will need to change this later to project specifications
-    private static final int myID = 1001;   //The peer will have this ID
+    private static final int myID = 1002;   //The peer will have this ID
 	public static void main(String[] args) throws Exception {
         //This block of code reads in the peer info file, splits each line into a list of string arrays, determines peers with lower ids
         int sPort = 0;
@@ -57,7 +57,7 @@ public class Peer {
         	try {
             	while(true) {
                 	new Handler(listener.accept(), clientNum).start();
-		    		System.out.println("Client " + clientNum + " is connected!");
+		    		System.out.println("Client " + clientNum + " is attempting to connect!");
 			    	clientNum++;
         		}
         	} finally {
