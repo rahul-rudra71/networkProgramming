@@ -1,42 +1,82 @@
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.InetAddress;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.ConnectException;
 import java.net.Socket;
-//import javax.swing.JOptionPane;
-
+import java.net.UnknownHostException;
 
 public class Client {
-    private static final String SERVER_IP = "127.0.0.1";
-    private static final int SERVER_PORT = 9090;
+	Socket requestSocket;           //socket connect to the server
+	ObjectOutputStream out;         //stream write to the socket
+ 	ObjectInputStream in;          //stream read from the socket
+	String message;                //message send to the server
+	String MESSAGE;                //capitalized message read from the server
 
-    public static void main(String[] args)  throws IOException{
-        Socket socket = new Socket(SERVER_IP, SERVER_PORT);
-        System.out.println("[Client] Connected to Server");
-        InetAddress myIP=InetAddress.getLocalHost();
+	public void Client() {}
 
-        //Buffer to take in what the Server has sent (date) required for taking in data
-        BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-        //Buffer to output what has been typed by user (not sure if this is required for sending out data but O don't think so)
-        BufferedReader keyboard = new BufferedReader(new InputStreamReader(System.in));
-
-        PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-        while (true) {
-            System.out.print("Enter Input: ");
-            String userIn = keyboard.readLine();
-            out.println(myIP.getHostAddress() + ": " + userIn);
-
-            if (userIn.equals("quit"))
-                break;
-            
-            String serverResponse = input.readLine();
-            System.out.println("[Server] response: " + serverResponse);
-            //JOptionPane.showMessageDialog(null, serverResponse);
-        }
-
-        System.out.println("[Client] Closing Client socket");
-        socket.close();
-        System.exit(0);
-    }
+	void run() {
+		try {
+			//create a socket to connect to the server
+			requestSocket = new Socket("localhost", 8000);
+			System.out.println("Connected to localhost in port 8000");
+			//initialize inputStream and outputStream
+			out = new ObjectOutputStream(requestSocket.getOutputStream());
+			out.flush();
+			in = new ObjectInputStream(requestSocket.getInputStream());
+			
+			//get Input from standard input
+			BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
+			while(true) {
+				System.out.print("Hello, please input a sentence: ");
+				//read a sentence from the standard input
+				message = bufferedReader.readLine();
+                //Send the sentence to the server
+                if(message.contains("quit")) {
+                    sendMessage(message);
+                    break;
+                } else {
+                    sendMessage(message);
+                }
+				//Receive the upperCase sentence from the server
+				MESSAGE = (String)in.readObject();
+				//show the message to the user
+				System.out.println("Receive message: " + MESSAGE);
+			}
+		} catch(ConnectException e) {
+    		System.err.println("Connection refused. You need to initiate a server first.");
+		} catch(ClassNotFoundException e) {
+            System.err.println("Class not found");
+        } catch(UnknownHostException unknownHost) {
+			System.err.println("You are trying to connect to an unknown host!");
+		} catch(IOException ioException) {
+			ioException.printStackTrace();
+		} finally {
+			//Close connections
+			try {
+				in.close();
+				out.close();
+                requestSocket.close();
+                System.out.println("Disconnected with Server");
+			} catch(IOException ioException) {
+				ioException.printStackTrace();
+			}
+		}
+	}
+	//send a message to the output stream
+	void sendMessage(String msg) {
+		try {
+			//stream write the message
+			out.writeObject(msg);
+			out.flush();
+		} catch(IOException ioException) {
+			ioException.printStackTrace();
+		}
+	}
+	//main method
+	public static void main(String args[]) {
+		Client client = new Client();
+		client.run();
+	}
 }
