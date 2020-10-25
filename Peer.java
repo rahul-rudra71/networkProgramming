@@ -87,20 +87,40 @@ public class Peer {
                 out = new ObjectOutputStream(connection.getOutputStream());
                 out.flush();
                 in = new ObjectInputStream(connection.getInputStream());
+                boolean shake = false;
                 try{
                     while(true) {
                         //receive the message sent from the client
                         message = (String)in.readObject();
                         //show the message to the user
                         System.out.println("Receive message: " + message + " from client " + no);
-                        if(message.contains("quit")) {
-                            break;
+
+                        //if statement determines if first message is handshake
+                        //if handshake was successful enter if
+                        if(shake) {
+                            if(message.equals("quit")) {
+                                break;
+                            } else {
+                                //Capitalize all letters in the message
+                                MESSAGE = message.toUpperCase();
+                                //send MESSAGE back to the client
+                                sendMessage(MESSAGE);
+                            }
                         } else {
-                            //Capitalize all letters in the message
-                            MESSAGE = message.toUpperCase();
+                            //if first message is P2P, handshake is successful 
+                            if(message.equals("P2P")) {
+                                System.out.println("handshake");
+                                MESSAGE = "handshake";
+                                sendMessage(MESSAGE);
+                                shake = true;
+                            //otherwise bad handshake and disconnect
+                            } else {
+                                System.out.println("bad handshake");
+                                MESSAGE = "bad handshake";
+                                sendMessage(MESSAGE);
+                                break;
+                            }
                         }
-                        //send MESSAGE back to the client
-                        sendMessage(MESSAGE);
                     }
                 } catch(ClassNotFoundException classnot){
                     System.err.println("Data received in unknown format");
