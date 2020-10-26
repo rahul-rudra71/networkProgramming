@@ -16,10 +16,10 @@ public class Peer {
 	public static void main(String[] args) throws Exception {
         //This block of code reads in the peer info file, splits each line into a list of string arrays, determines peers with lower ids
         int sPort = 0;
+        List<String[]> peerList = new ArrayList<String[]>();
         try {
             File myObj = new File("PeerInfo.cfg");
             Scanner myReader = new Scanner(myObj);
-            List<String[]> peerList = new ArrayList<String[]>();
 
             //parsing through file
             while(myReader.hasNextLine()) {
@@ -35,51 +35,51 @@ public class Peer {
                     peerList.add(peerData);
             }
             myReader.close();
-
-            // connect to peers with lower id
-            if(peerList.size() != 0) {
-                for (String[] s : peerList) {
-                    Socket requestSocket = new Socket(s[1], Integer.parseInt(s[2]));
-        			System.out.println("Connected to "+ s[1] +" in " + s[2]);
-                }
-            } else {
-                System.out.println("I am Top");
-            }
         } catch (FileNotFoundException e) {
             System.out.println("An error occurred.");
             e.printStackTrace();
         }
 
-        //Here we begin handling our peers
-		System.out.println("The Peer1 is running."); 
+        //connect to peers with lower id (peers we want to connect to)
+        //create two threads to run simulatneous
+        if(peerList.size() != 0) {
+            for (String[] s : peerList) {
+                Socket requestSocket = new Socket(s[1], Integer.parseInt(s[2]));
+                System.out.println("Connected to "+ s[1] +" in " + s[2]);
+            }
+        } else {
+            System.out.println("I am Top");
+        }
+        
+
+        //Here we begin handling our peers who connect to us
+		System.out.println("The Peer"+ myID +" is running."); 
         ServerSocket listener = new ServerSocket(sPort);
-		int clientNum = 1;
-        	try {
-            	while(true) {
-                	new Handler(listener.accept(), clientNum).start();
-		    		System.out.println("Client " + clientNum + " is connected!");
-			    	clientNum++;
-        		}
-        	} finally {
-        		listener.close();
-        	} 
- 
-    	}
+		int clientNum = 0;
+        try {
+        	while(true) {
+            	new Handler(listener.accept(), clientNum).start();
+	    		System.out.println("Client " + clientNum + " is connected!");
+		    	clientNum++;
+    		}
+        } finally {
+    		listener.close();
+    	} 
+    }
 
-	    /* A handler thread class.  Handlers are spawned from the listening
-     	loop and are responsible for dealing with a single client's requests.*/
-    	private static class Handler extends Thread {
-        	private String message;    //message received from the client
-		    private String MESSAGE;    //uppercase message send to the client
-		    private Socket connection;
-        	private ObjectInputStream in;	//stream read from the socket
-        	private ObjectOutputStream out;    //stream write to the socket
-		    private int no;		//The index number of the client
+	    /* A handler thread class.  Handlers are spawned everytime a peer tries to connect with you*/
+    private static class Handler extends Thread {
+        private String message;    //message received from the client
+		private String MESSAGE;    //uppercase message send to the client
+		private Socket connection;
+        private ObjectInputStream in;	//stream read from the socket
+        private ObjectOutputStream out;    //stream write to the socket
+		private int no;		//The index number of the client
 
-        	public Handler(Socket connection, int no) {
-            	this.connection = connection;
-	    		this.no = no;
-        	}
+        public Handler(Socket connection, int no) {
+        	this.connection = connection;
+	    	this.no = no;
+        }
 
         public void run() {
             try {
@@ -146,8 +146,7 @@ public class Peer {
                 out.writeObject(msg);
                 out.flush();
                 System.out.println("Send message: " + msg + " to Client " + no);
-            }
-            catch(IOException ioException) {
+            } catch(IOException ioException) {
                 ioException.printStackTrace();
             }
         }
