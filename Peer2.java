@@ -1,8 +1,6 @@
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.ConnectException;
@@ -47,8 +45,7 @@ public class Peer2 {
         //connect to peers with lower id (peers we want to connect to)
         if(peerList.size() != 0) {
             for (String[] s : peerList) {
-                new peerHandler(s[1], Integer.parseInt(s[2])).start();
-                //System.out.println("Connected to "+ s[1] +" in " + s[2]);
+                new peerHandler(s[1], Integer.parseInt(s[2]), Integer.parseInt(s[0])).start();
             }
         } else {
             System.out.println("I am Top");
@@ -57,64 +54,87 @@ public class Peer2 {
         //Here we begin handling our peers who connect to us
 		System.out.println("The Peer"+ myID +" is running."); 
         ServerSocket listener = new ServerSocket(sPort);
-		int clientNum = 1;
+		//int clientNum = 1;
         try {
         	while(true) {
-            	new Handler(listener.accept(), clientNum).start();
-	    		System.out.println("Client " + clientNum + " is connected!");
-		    	clientNum++;
+            	new Handler(listener.accept()).start();
+	    		System.out.println("Someone is attempting to connect!");
+		    	//clientNum++;
     		}
         } finally {
     		listener.close();
     	} 
     }
 
+    /* A peerhandler thread class. peerhandlers are spawned everytime you want to connect to a peer lower than yourself
+    This is the client perspective of the project*/
     private static class peerHandler extends Thread {
-        private String peerdest; 
-        private int peerPort;
-        private ObjectOutputStream out;         //stream write to the socket
+        private String peerdest;               //peer's ip
+        private int peerPort;                  //peer's port number
+        private int peerID;                    //peer's ID 
+        private ObjectOutputStream out;        //stream write to the socket
  	    private ObjectInputStream in;          //stream read from the socket
-	    private String message;                //message send to the server
-        private String MESSAGE; 
-        Socket requestSocket;
+	    private String inMessage;              //messages coming in
+        private String outMessage;             //messages going out     
+        Socket requestSocket;                  //the socket we are requesting
 
-        public peerHandler(String peerdest, int peerPort) {
+        public peerHandler(String peerdest, int peerPort, int peerID) {
             this.peerdest = peerdest;
             this.peerPort = peerPort;
+            this.peerID = peerID;
         }
 
         public void run() {
             try {
                 //create a socket to connect to the server
                 requestSocket = new Socket(peerdest, peerPort);
-                System.out.println("Connected to "+ peerdest +" in " + Integer.toString(peerPort));
+                System.out.println("Attempting to connect to "+ peerdest +" in "+ Integer.toString(peerPort) +" [Peer "+ peerID +"]");
 
+                //initialize inpput/output streams
                 out = new ObjectOutputStream(requestSocket.getOutputStream());
                 out.flush();
                 in = new ObjectInputStream(requestSocket.getInputStream());
-                
-                //get Input from standard input
-                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
+                boolean shake = false;
+
+                //send handshake message to peer I want to connect to
+                outMessage = "P2PFILESHARINGPROJ0000000000" + Integer.toString(myID);
+                sendMessage(outMessage);
+        
                 while(true) {
-                    //System.out.print("Hello, please input a sentence: ");
-                    
-                    //read a sentence from the standard input
-                    //message = bufferedReader.readLine();
-                    message = "P2PFILESHARINGPROJ0000000000" + Integer.toString(myID);
-                    
-                    //Send the sentence to the server
-                    if(message.contains("quit")) {
-                        out.writeObject(message);
-                        out.flush();
-                        break;
-                    } else {
-                        out.writeObject(message);
-                        out.flush();
-                    }
-                    //Receive the upperCase sentence from the server
-                    MESSAGE = (String)in.readObject();
+                    //receive the message sent from the client
+                    inMessage = (String)in.readObject();
                     //show the message to the user
-                    System.out.println("Receive message: " + MESSAGE);
+                    System.out.println("Receive message: " + inMessage + " from Peer " + peerID);
+
+                    //if statement determines if first message is handshake
+                    //if handshake was successful enter if
+                    if(shake) {
+                        // As of right now this if is never entered. handshakes are completed and then no messages are sent
+                        // program will be stuck waiting for the next message [message = (String)in.readObject()]
+                        // this is where the remaining logic will belong I believe
+
+                        //this block is just for reference not useful for acctual project
+                        /*if(message.equals("quit")) {
+                            break;
+                        } else {
+                            //Capitalize all letters in the message
+                            MESSAGE = message.toUpperCase();
+                            //send MESSAGE back to the client
+                            sendMessage(MESSAGE);
+                        }*/
+                    } else {
+                        //if first message is P2P, handshake is successful 
+                        if((inMessage.substring(0, 18)).equals("P2PFILESHARINGPROJ")) {
+                            System.out.println("Handshake with peer " + Integer.toString(peerID) + " successful");
+                            shake = true;
+                        //otherwise bad handshake and disconnect
+                        } else {
+                            System.out.println("bad handshake");
+                            outMessage= "bad handshake";
+                            sendMessage(outMessage);
+                            break;
+                        }
+                    }
                 }
             } catch(ConnectException e) {
                 System.err.println("Connection refused. You need to initiate a server first.");
@@ -136,19 +156,33 @@ public class Peer2 {
                 }
             }
         }
-    }
-    /* A handler thread class.  Handlers are spawned everytime a peer tries to connect with you*/
-    private static class Handler extends Thread {
-        private String message;    //message received from the client
-		private String MESSAGE;    //uppercase message send to the client
-		private Socket connection;
-        private ObjectInputStream in;	//stream read from the socket
-        private ObjectOutputStream out;    //stream write to the socket
-		private int no;		//The index number of the client
 
-        public Handler(Socket connection, int no) {
+        //method to send message to peer
+        public void sendMessage(String msg) {
+            try {
+                out.writeObject(msg);
+                out.flush();
+                System.out.println("Send message: " + msg + " to Peer " + Integer.toString(peerID));
+            } catch(IOException ioException) {
+                ioException.printStackTrace();
+            }
+        }
+    }
+
+    //code in Handler and peerHandler is largely the same with similar logic. difference in loop structure due to handshake
+
+    /* A handler thread class.  Handlers are spawned everytime a peer tries to connect with you
+    This is the server perspective of the project*/
+    private static class Handler extends Thread {
+        private Socket connection;             //connection to socket
+        private String inMessage;              //messages coming in
+		private String outMessage;             //messages going out
+        private ObjectInputStream in;	       //stream read from the socket
+        private ObjectOutputStream out;        //stream write to the socket
+        private int peerID;                    //peer's ID
+
+        public Handler(Socket connection) {
         	this.connection = connection;
-	    	this.no = no;
         }
 
         public void run() {
@@ -158,38 +192,36 @@ public class Peer2 {
                 out.flush();
                 in = new ObjectInputStream(connection.getInputStream());
                 boolean shake = false;
-                int peerID = 0;
                 try{
                     while(true) {
                         //receive the message sent from the client
-                        message = (String)in.readObject();
-                        //show the message to the user
-                        System.out.println("Receive message: " + message + " from client " + peerID);
+                        inMessage = (String)in.readObject();
 
                         //if statement determines if first message is handshake
                         //if handshake was successful enter if
                         if(shake) {
-                            if(message.equals("quit")) {
-                                break;
-                            } else {
-                                //Capitalize all letters in the message
-                                MESSAGE = message.toUpperCase();
-                                //send MESSAGE back to the client
-                                sendMessage(MESSAGE);
-                            }
+                            //show the message to the user
+                            System.out.println("Receive message: " + inMessage + " from Peer " +peerID);
                         } else {
-                            //if first message is P2P, handshake is successful 
-                            if((message.substring(0, 18)).equals("P2PFILESHARINGPROJ")) {
-                                System.out.println("handshake");
-                                MESSAGE = "handshake";
-                                sendMessage(MESSAGE);
-                                peerID = Integer.parseInt(message.substring(message.length() - 4));
+                            //if first message is correct, handshake is successful 
+                            if((inMessage.substring(0, 18)).equals("P2PFILESHARINGPROJ")) {
+                                peerID = Integer.parseInt(inMessage.substring(inMessage.length() - 4));
+
+                                //show the message to the user
+                                System.out.println("Receive message: " + inMessage + " from Peer " +peerID);
+                                System.out.println("Handshake with peer " + Integer.toString(peerID) + " successful");
+
+                                //return handshake
+                                outMessage = "P2PFILESHARINGPROJ0000000000" + Integer.toString(myID);
+                                sendMessage(outMessage);
                                 shake = true;
                             //otherwise bad handshake and disconnect
                             } else {
+                                System.out.println("Received message: " + inMessage);
                                 System.out.println("bad handshake");
-                                MESSAGE = "bad handshake";
-                                sendMessage(MESSAGE);
+                                outMessage = "bad handshake";
+                                out.writeObject(outMessage);
+                                out.flush();
                                 break;
                             }
                         }
@@ -205,9 +237,9 @@ public class Peer2 {
                     in.close();
                     out.close();
                     connection.close();
-                    System.out.println("Disconnect with Client " + no);
+                    System.out.println("Disconnect with Client");
                 } catch(IOException ioException) {
-                    System.out.println("Disconnect with Client " + no);
+                    System.out.println("Disconnect with Client");
                 }
             }
         }
@@ -217,7 +249,7 @@ public class Peer2 {
             try {
                 out.writeObject(msg);
                 out.flush();
-                System.out.println("Send message: " + msg + " to Client " + no);
+                System.out.println("Send message: " + msg + " to Peer "+ peerID);
             } catch(IOException ioException) {
                 ioException.printStackTrace();
             }
