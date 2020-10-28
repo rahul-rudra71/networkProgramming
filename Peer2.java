@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 import java.util.HashMap;
+import java.util.Map;
 
 public class Peer2 {
 
@@ -104,6 +105,7 @@ public class Peer2 {
                 String contents = "";
                 String zero_pad = "";
                 int length_bytes = 0;
+                boolean sentInterest = false;
 
                 //send handshake message to peer I want to connect to
                 outMessage = "P2PFILESHARINGPROJ0000000000" + Integer.toString(myID);
@@ -144,11 +146,17 @@ public class Peer2 {
                         if(msg_type.equals("1")) {}
 
                         // Interested --> 2
-                        if(msg_type.equals("2")) {}
+                        if(msg_type.equals("2")) {
                             //add peerID --> interest pair to map
                             peer_interest.add(peerID);
+                        }
                         // Not Interested --> 3
-                        if(msg_type.equals("3")) {}
+                        if(msg_type.equals("3")) {
+                            //remove peer from list of interested peers
+                            if(peer_interest.contains(peerID)){
+                                peer_interest.remove(peerID);
+                            }
+                        }
 
                         // Have --> 4
                         if(msg_type.equals("4")) {}
@@ -165,9 +173,20 @@ public class Peer2 {
                                 outMessage = "00013";
                                 sendMessage(outMessage);
                             }else{
-                                //bitfields differ, interested
-                                outMessage = "00012";
-                                sendMessage(outMessage);
+                                for(int i = 0; i < contents.length(); i++){
+                                    if(Integer.parseInt(contents.substring(i, i + 1)) > Integer.parseInt(bitfield.substring(i, i + 1))){
+                                        //peers bitfield has pieces that this bitfield lacks
+                                        outMessage = "00012";
+                                        sendMessage(outMessage);
+                                        sentInterest = true;
+                                        break;
+                                    }
+                                }
+                                //this bitfield has pieces that the peers bitfield lacks
+                                if(!sentInterest){
+                                    outMessage = "00013";
+                                    sendMessage(outMessage);
+                                }
                             }
                         }
                         // Request --> 6
@@ -265,6 +284,7 @@ public class Peer2 {
                 String contents = "";
                 String zero_pad = "";
                 int length_bytes = 0;
+                boolean sentInterest = false;
 
                 try{
                     while(true) {
@@ -289,11 +309,17 @@ public class Peer2 {
                             if(msg_type.equals("1")) {}
 
                             // Interested --> 2
-                            if(msg_type.equals("2")) {}
-
+                            if(msg_type.equals("2")) {
+                                //add peerID --> interest pair to map
+                                peer_interest.add(peerID);
+                            }
                             // Not Interested --> 3
-                            if(msg_type.equals("3")) {}
-
+                            if(msg_type.equals("3")) {
+                                //remove peer from list of interested peers
+                                if(peer_interest.contains(peerID)){
+                                    peer_interest.remove(peerID);
+                                }
+                            }
                             // Have --> 4
                             if(msg_type.equals("4")) {}
 
@@ -310,11 +336,21 @@ public class Peer2 {
                                     outMessage = "00013";
                                     sendMessage(outMessage);
                                 }else{
-                                    //bitfields differ, interested
-                                    outMessage = "00012";
-                                    sendMessage(outMessage);
+                                    for(int i = 0; i < contents.length(); i++){
+                                        if(Integer.parseInt(contents.substring(i, i + 1)) > Integer.parseInt(bitfield.substring(i, i + 1))){
+                                            //peers bitfield has pieces that this bitfield lacks
+                                            outMessage = "00012";
+                                            sendMessage(outMessage);
+                                            sentInterest = true;
+                                            break;
+                                        }
+                                    }
+                                    //this bitfield has pieces that the peers bitfield lacks
+                                    if(!sentInterest){
+                                        outMessage = "00013";
+                                        sendMessage(outMessage);
+                                    }
                                 }
-
                                 //send own bitfield back to client peer
 
                                 //zero pad message length field if needed
