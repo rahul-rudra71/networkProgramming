@@ -10,11 +10,15 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.HashMap;
 
 public class Peer2 {
 
     //this is just for testing we will need to change this later to project specifications
     private static final int myID = 1001;   //The peer will have this ID
+    public static String bitfield = "0000000000";
+    public static HashMap<Integer, String> peer_bits = new HashMap<Integer, String>();
+    public static List<Integer> peer_interest = new ArrayList<Integer>();
 	public static void main(String[] args) throws Exception {
         //This block of code reads in the peer info file, splits each line into a list of string arrays, determines peers with lower ids
         int sPort = 0;
@@ -90,11 +94,16 @@ public class Peer2 {
                 requestSocket = new Socket(peerdest, peerPort);
                 System.out.println("Attempting to connect to "+ peerdest +" in "+ Integer.toString(peerPort) +" [Peer "+ peerID +"]");
 
-                //initialize inpput/output streams
+                //initialize input/output streams
                 out = new ObjectOutputStream(requestSocket.getOutputStream());
                 out.flush();
                 in = new ObjectInputStream(requestSocket.getInputStream());
                 boolean shake = false;
+                int length = 0;
+                String msg_type = "";
+                String contents = "";
+                String zero_pad = "";
+                int length_bytes = 0;
 
                 //send handshake message to peer I want to connect to
                 outMessage = "P2PFILESHARINGPROJ0000000000" + Integer.toString(myID);
@@ -122,11 +131,70 @@ public class Peer2 {
                             //send MESSAGE back to the client
                             sendMessage(MESSAGE);
                         }*/
+
+                        // Delimit the message length and type from the received byte-string
+                        length = Integer.parseInt(inMessage.substring(0,4));
+                        msg_type = inMessage.substring(4,5);
+                        contents = inMessage.substring(5);
+
+                        // Choke --> 0
+                        if(msg_type.equals("0")) {}
+                            
+                        // Unchoke --> 1
+                        if(msg_type.equals("1")) {}
+
+                        // Interested --> 2
+                        if(msg_type.equals("2")) {}
+                            //add peerID --> interest pair to map
+                            peer_interest.add(peerID);
+                        // Not Interested --> 3
+                        if(msg_type.equals("3")) {}
+
+                        // Have --> 4
+                        if(msg_type.equals("4")) {}
+
+                        // Bitfield --> 5
+                        if(msg_type.equals("5")) {
+                            //add peerID --> bitfield pair to map
+                            peer_bits.put(peerID, contents);
+
+                            //determine if server peer has pieces that client peer does not, then send
+                            //appropriate interest message
+                            if(peer_bits.get(peerID).equals(bitfield)){
+                                //bifields are equivalent, not interested
+                                outMessage = "00013";
+                                sendMessage(outMessage);
+                            }else{
+                                //bitfields differ, interested
+                                outMessage = "00012";
+                                sendMessage(outMessage);
+                            }
+                        }
+                        // Request --> 6
+                        if(msg_type.equals("6")) {}
+
+                        // Piece --> 7
+                        if(msg_type.equals("7")) {}
+
                     } else {
                         //if first message is P2P, handshake is successful 
                         if((inMessage.substring(0, 18)).equals("P2PFILESHARINGPROJ")) {
                             System.out.println("Handshake with peer " + Integer.toString(peerID) + " successful");
                             shake = true;
+                            //send bitfield message to new peer connection to be used in establishing piece interest
+                            
+                            //zero pad length field if needed
+                            zero_pad = Integer.toString(bitfield.length() + 1);
+                            if(zero_pad.length() < 4){
+                                length_bytes = zero_pad.length();
+                                for(int i = 0; i < (4 - length_bytes); i++){
+                                    zero_pad = "0" + zero_pad;
+                                }
+                            }
+                            
+                            outMessage = zero_pad + "5" + bitfield;
+                            sendMessage(outMessage);
+
                         //otherwise bad handshake and disconnect
                         } else {
                             System.out.println("bad handshake");
@@ -192,6 +260,12 @@ public class Peer2 {
                 out.flush();
                 in = new ObjectInputStream(connection.getInputStream());
                 boolean shake = false;
+                String msg_type = "";
+                int length = 0;
+                String contents = "";
+                String zero_pad = "";
+                int length_bytes = 0;
+
                 try{
                     while(true) {
                         //receive the message sent from the client
@@ -201,7 +275,66 @@ public class Peer2 {
                         //if handshake was successful enter if
                         if(shake) {
                             //show the message to the user
-                            System.out.println("Receive message: " + inMessage + " from Peer " +peerID);
+                            System.out.println("Receive message: " + inMessage + " from Peer " + peerID);
+                            // add parsing logic from peerHandler class here
+                            // Delimit the message length and type from the received byte-string
+                            length = Integer.parseInt(inMessage.substring(0,4));
+                            msg_type = inMessage.substring(4,5);
+                            contents = inMessage.substring(5);
+
+                            // Choke --> 0
+                            if(msg_type.equals("0")) {}
+                                
+                            // Unchoke --> 1
+                            if(msg_type.equals("1")) {}
+
+                            // Interested --> 2
+                            if(msg_type.equals("2")) {}
+
+                            // Not Interested --> 3
+                            if(msg_type.equals("3")) {}
+
+                            // Have --> 4
+                            if(msg_type.equals("4")) {}
+
+                            // Bitfield --> 5
+                            if(msg_type.equals("5")) {
+                                //add peerID --> bitfield pair to map
+                                //this new bitfield will be considered in the unchoking decision block, which runs on an input timer
+                                peer_bits.put(peerID, contents);
+
+                                //determine if server peer has pieces that client peer does not, then send
+                                //appropriate interest message
+                                if(peer_bits.get(peerID).equals(bitfield)){
+                                    //bifields are equivalent, not interested
+                                    outMessage = "00013";
+                                    sendMessage(outMessage);
+                                }else{
+                                    //bitfields differ, interested
+                                    outMessage = "00012";
+                                    sendMessage(outMessage);
+                                }
+
+                                //send own bitfield back to client peer
+
+                                //zero pad message length field if needed
+                                zero_pad = Integer.toString(bitfield.length() + 1);
+                                if(zero_pad.length() < 4){
+                                    length_bytes = zero_pad.length();
+                                    for(int i = 0; i < (4 - length_bytes); i++){
+                                        zero_pad = "0" + zero_pad;
+                                    }
+                                }
+
+                                outMessage = zero_pad + "5" + bitfield;
+                                sendMessage(outMessage);
+                            }
+                            // Request --> 6
+                            if(msg_type.equals("6")) {}
+
+                            // Piece --> 7
+                            if(msg_type.equals("7")) {}
+                            
                         } else {
                             //if first message is correct, handshake is successful 
                             if((inMessage.substring(0, 18)).equals("P2PFILESHARINGPROJ")) {
