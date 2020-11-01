@@ -12,14 +12,17 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.HashMap;
 import java.util.Map;
+import java.lang.Math;
 
 public class Peer2 {
 
     //this is just for testing we will need to change this later to project specifications
-    private static final int myID = 1001;   //The peer will have this ID
-    public static String bitfield = "0000000000";
+    private static final int myID = 1002;   //The peer will have this ID
+    public static String bitfield = "0000000001";
     public static HashMap<Integer, String> peer_bits = new HashMap<Integer, String>();
     public static List<Integer> peer_interest = new ArrayList<Integer>();
+    public static List<String> pieces = new ArrayList<String>();
+    public static HashMap<String, String> metadata = new HashMap<String, String>();
 	public static void main(String[] args) throws Exception {
         //This block of code reads in the peer info file, splits each line into a list of string arrays, determines peers with lower ids
         int sPort = 0;
@@ -40,6 +43,39 @@ public class Peer2 {
                 //each line is put into array split by spaces
                 if(peerID < myID)
                     peerList.add(peerData);
+            }
+            myReader.close();
+        } catch (FileNotFoundException e) {
+            System.out.println("An error occurred.");
+            e.printStackTrace();
+        }
+
+        //This block reads the common configuration file and gathers metadata for the process, including
+        //preferred neighbor count, file size, piece size, etc.
+        try {
+            File myObj = new File("Common.cfg");
+            Scanner myReader = new Scanner(myObj);
+
+            //parsing through file
+            while(myReader.hasNextLine()) {
+                String[] fileData = (myReader.nextLine()).split(" ");
+                metadata.put(fileData[0], fileData[1]);
+            }
+            myReader.close();
+        } catch (FileNotFoundException e) {
+            System.out.println("An error occurred.");
+            e.printStackTrace();
+        }
+
+        //This block reads in the current piece contents of the file meant to be transferred by the protocol
+        try {
+            File myObj = new File(metadata.get("FileName"));
+            Scanner myReader = new Scanner(myObj);
+
+            //parsing through file
+            while(myReader.hasNextLine()) {
+                String fileData = myReader.nextLine();
+                pieces.add(fileData);
             }
             myReader.close();
         } catch (FileNotFoundException e) {
@@ -143,7 +179,35 @@ public class Peer2 {
                         if(msg_type.equals("0")) {}
                             
                         // Unchoke --> 1
-                        if(msg_type.equals("1")) {}
+                        if(msg_type.equals("1")) {
+                            //server peer has unchoked this client peer because it has previously sent an interest
+                            //message to the server peer, begin sending requests to server
+                            
+                            //iterate through servers bitfield and own bitfield and get list of pieces needed
+                            List<Integer> neededFromServer = new ArrayList<Integer>();
+                            for(int i = 0; i < bitfield.length(); i++){
+                                if(Integer.parseInt(bitfield.substring(i, i+1)) < Integer.parseInt(peer_bits.get(peerID).substring(i, i+1))){
+                                    neededFromServer.add(i);
+                                }
+                            }
+
+                            int requested = (int) (Math.random() * neededFromServer.size());
+                            zero_pad = Integer.toString(neededFromServer.get(requested));
+
+                            //zero pad index field if needed
+                            if(zero_pad.length() < 4){
+                                length_bytes = zero_pad.length();
+                                for(int i = 0; i < (4 - length_bytes); i++){
+                                    zero_pad = "0" + zero_pad;
+                                }
+                            }
+
+                            //construct message, length will always be 5 for type + index
+                            outMessage = "00056" + zero_pad;
+                            sendMessage(outMessage);
+                            
+                            zero_pad = "";
+                        }
 
                         // Interested --> 2
                         if(msg_type.equals("2")) {
@@ -190,10 +254,35 @@ public class Peer2 {
                             }
                         }
                         // Request --> 6
-                        if(msg_type.equals("6")) {}
+                        if(msg_type.equals("6")) {
+                            //client peer receieved request for one of its pieces from server peer
+                            //read bytes from file
+                            String piece_to_send = pieces.get(Integer.parseInt(contents));
+
+                            //zero pad length field if needed
+                            zero_pad = Integer.toString(piece_to_send.length() + 1);
+                            if(zero_pad.length() < 4){
+                                length_bytes = zero_pad.length();
+                                for(int i = 0; i < (4 - length_bytes); i++){
+                                    zero_pad = "0" + zero_pad;
+                                }
+                            }
+
+                            outMessage = zero_pad + "7" + contents + piece_to_send;
+                            sendMessage(outMessage);
+
+                            zero_pad = "";
+                        }
 
                         // Piece --> 7
-                        if(msg_type.equals("7")) {}
+                        if(msg_type.equals("7")) {
+                            //client received a requested piece from the server, store in pieces arrraylist
+                            String index_contents = contents.substring(0,4);
+                            String piece_contents = contents.substring(4, contents.length());
+                            pieces.set(Integer.parseInt(index_contents), piece_contents);
+
+                            //send have message to connected peers, change contents of bitfield
+                        }
 
                     } else {
                         //if first message is P2P, handshake is successful 
@@ -213,6 +302,8 @@ public class Peer2 {
                             
                             outMessage = zero_pad + "5" + bitfield;
                             sendMessage(outMessage);
+
+                            zero_pad = "";
 
                         //otherwise bad handshake and disconnect
                         } else {
@@ -303,10 +394,41 @@ public class Peer2 {
                             contents = inMessage.substring(5);
 
                             // Choke --> 0
-                            if(msg_type.equals("0")) {}
+                            if(msg_type.equals("0")) {
+                                //client peer has choked this server peer because it is not a preferred neighbor or optimistically
+                                //unchoked neighbor
+                            }
                                 
                             // Unchoke --> 1
-                            if(msg_type.equals("1")) {}
+                            if(msg_type.equals("1")) {
+                                //client peer has unchoked this server peer because it has previously sent an interest
+                                //message to the client peer, begin sending requests to client
+                                
+                                //iterate through servers bitfield and own bitfield and get list of pieces needed
+                                List<Integer> neededFromClient = new ArrayList<Integer>();
+                                for(int i = 0; i < bitfield.length(); i++){
+                                    if(Integer.parseInt(bitfield.substring(i, i+1)) < Integer.parseInt(peer_bits.get(peerID).substring(i, i+1))){
+                                        neededFromClient.add(i);
+                                    }
+                                }
+
+                                int requested = (int) (Math.random() * neededFromClient.size());
+                                zero_pad = Integer.toString(neededFromClient.get(requested));
+
+                                //zero pad index field if needed
+                                if(zero_pad.length() < 4){
+                                    length_bytes = zero_pad.length();
+                                    for(int i = 0; i < (4 - length_bytes); i++){
+                                        zero_pad = "0" + zero_pad;
+                                    }
+                                }
+
+                                //construct message, length will always be 5 for type + index
+                                outMessage = "00056" + zero_pad;
+                                sendMessage(outMessage);
+                                
+                                zero_pad = "";
+                            }
 
                             // Interested --> 2
                             if(msg_type.equals("2")) {
@@ -340,7 +462,6 @@ public class Peer2 {
                                         if(Integer.parseInt(contents.substring(i, i + 1)) > Integer.parseInt(bitfield.substring(i, i + 1))){
                                             //peers bitfield has pieces that this bitfield lacks
                                             outMessage = "00012";
-                                            sendMessage(outMessage);
                                             sentInterest = true;
                                             break;
                                         }
@@ -364,12 +485,39 @@ public class Peer2 {
 
                                 outMessage = zero_pad + "5" + bitfield;
                                 sendMessage(outMessage);
+
+                                zero_pad = "";
                             }
                             // Request --> 6
-                            if(msg_type.equals("6")) {}
+                            if(msg_type.equals("6")) {
+                                //server peer receieved request for one of its pieces from client peer
+                                //read bytes from file
+                                String piece_to_send = pieces.get(Integer.parseInt(contents));
+
+                                //zero pad length field if needed
+                                zero_pad = Integer.toString(piece_to_send.length() + 1);
+                                if(zero_pad.length() < 4){
+                                    length_bytes = zero_pad.length();
+                                    for(int i = 0; i < (4 - length_bytes); i++){
+                                        zero_pad = "0" + zero_pad;
+                                    }
+                                }
+
+                                outMessage = zero_pad + "7" + piece_to_send;
+                                sendMessage(outMessage);
+
+                                zero_pad = "";
+                            }
 
                             // Piece --> 7
-                            if(msg_type.equals("7")) {}
+                            if(msg_type.equals("7")) {
+                                //server received a requested piece from the client, store in pieces arrraylist
+                                String index_contents = contents.substring(0,4);
+                                String piece_contents = contents.substring(4, contents.length());
+                                pieces.set(Integer.parseInt(index_contents), piece_contents);
+
+                                //send have message to connected peers, change contents of bitfield
+                            }
                             
                         } else {
                             //if first message is correct, handshake is successful 
