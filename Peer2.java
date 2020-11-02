@@ -66,22 +66,56 @@ public class Peer2 {
             System.out.println("An error occurred.");
             e.printStackTrace();
         }
-
+        String fileData = "";
         //This block reads in the current piece contents of the file meant to be transferred by the protocol
         try {
             File myObj = new File(metadata.get("FileName"));
             Scanner myReader = new Scanner(myObj);
-
             //parsing through file
             while(myReader.hasNextLine()) {
-                String fileData = myReader.nextLine();
-                pieces.add(fileData);
+                fileData = fileData + myReader.nextLine();
+                //pieces.add(fileData);
             }
             myReader.close();
         } catch (FileNotFoundException e) {
             System.out.println("An error occurred.");
             e.printStackTrace();
         }
+
+        //create bitfield
+        int fileSize = Integer.parseInt(metadata.get("FileSize"));
+        int pieceSize = Integer.parseInt(metadata.get("PieceSize"));
+        int fileSpot = 0;
+        for(int i = 0; i < Math.ceil(Double.valueOf(fileSize) / Double.valueOf(pieceSize)); i++) {
+            try {
+                String temp = fileData.substring(fileSpot, fileSpot + pieceSize);
+                temp = temp.trim();
+                if(temp.length() == 0) {
+                    pieces.add(fileData.substring(fileSpot, fileSpot + pieceSize));
+                    bitfield = bitfield + "0";
+                } else {
+                    pieces.add(fileData.substring(fileSpot, fileSpot + pieceSize));
+                    bitfield = bitfield + "1";
+                }
+            } catch(StringIndexOutOfBoundsException e) {
+                String temp = fileData.substring(fileSpot);
+                temp = temp.trim();
+                if(temp.length() == 0) {
+                    pieces.add(fileData.substring(fileSpot));
+                    bitfield = bitfield + "0";
+                } else {
+                    pieces.add(fileData.substring(fileSpot));
+                    bitfield = bitfield + "1";
+                }
+            }
+            
+            fileSpot = fileSpot + pieceSize;
+        }
+
+        //we can delete this. just for visual confirmation
+        System.out.print("pieces: ");
+        System.out.println(pieces);
+        System.out.println("bitfield: " + bitfield);
 
         //connect to peers with lower id (peers we want to connect to)
         if(peerList.size() != 0) {
@@ -156,20 +190,6 @@ public class Peer2 {
                     //if statement determines if first message is handshake
                     //if handshake was successful enter if
                     if(shake) {
-                        // As of right now this if is never entered. handshakes are completed and then no messages are sent
-                        // program will be stuck waiting for the next message [message = (String)in.readObject()]
-                        // this is where the remaining logic will belong I believe
-
-                        //this block is just for reference not useful for acctual project
-                        /*if(message.equals("quit")) {
-                            break;
-                        } else {
-                            //Capitalize all letters in the message
-                            MESSAGE = message.toUpperCase();
-                            //send MESSAGE back to the client
-                            sendMessage(MESSAGE);
-                        }*/
-
                         // Delimit the message length and type from the received byte-string
                         length = Integer.parseInt(inMessage.substring(0,4));
                         msg_type = inMessage.substring(4,5);
