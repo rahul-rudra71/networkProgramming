@@ -17,8 +17,8 @@ import java.lang.Math;
 public class Peer2 {
 
     //this is just for testing we will need to change this later to project specifications
-    private static final int myID = 1002;   //The peer will have this ID
-    public static String bitfield = "0000000001";
+    private static final int myID = 1001;   //The peer will have this ID
+    public static String bitfield = "";
     public static HashMap<Integer, String> peer_bits = new HashMap<Integer, String>();
     public static List<Integer> peer_interest = new ArrayList<Integer>();
     public static List<String> pieces = new ArrayList<String>();
@@ -223,7 +223,13 @@ public class Peer2 {
                         }
 
                         // Have --> 4
-                        if(msg_type.equals("4")) {}
+                        if(msg_type.equals("4")) {
+                            //received have message from server peer, update their bitfield value in peer_bits hashmap
+                            String temp_field = peer_bits.get(peerID);
+                            temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
+
+                            //reevaluate interest???
+                        }
 
                         // Bitfield --> 5
                         if(msg_type.equals("5")) {
@@ -280,8 +286,14 @@ public class Peer2 {
                             String index_contents = contents.substring(0,4);
                             String piece_contents = contents.substring(4, contents.length());
                             pieces.set(Integer.parseInt(index_contents), piece_contents);
+                            System.out.println("Piece obtained: " + piece_contents);
 
                             //send have message to connected peers, change contents of bitfield
+                            bitfield = bitfield.substring(0, Integer.parseInt(index_contents)) + "1" + bitfield.substring(Integer.parseInt(index_contents) + 1);
+
+                            outMessage = "00054" + index_contents;
+                            sendMessage(outMessage);
+
                         }
 
                     } else {
@@ -434,6 +446,8 @@ public class Peer2 {
                             if(msg_type.equals("2")) {
                                 //add peerID --> interest pair to map
                                 peer_interest.add(peerID);
+                                outMessage = "00011";
+                                sendMessage(outMessage);
                             }
                             // Not Interested --> 3
                             if(msg_type.equals("3")) {
@@ -443,7 +457,13 @@ public class Peer2 {
                                 }
                             }
                             // Have --> 4
-                            if(msg_type.equals("4")) {}
+                            if(msg_type.equals("4")) {
+                                //received have message from client peer, update their bitfield value in peer_bits hashmap
+                                String temp_field = peer_bits.get(peerID);
+                                temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
+
+                                //reevaluate interest???
+                            }
 
                             // Bitfield --> 5
                             if(msg_type.equals("5")) {
@@ -462,6 +482,7 @@ public class Peer2 {
                                         if(Integer.parseInt(contents.substring(i, i + 1)) > Integer.parseInt(bitfield.substring(i, i + 1))){
                                             //peers bitfield has pieces that this bitfield lacks
                                             outMessage = "00012";
+                                            sendMessage(outMessage);
                                             sentInterest = true;
                                             break;
                                         }
@@ -472,8 +493,8 @@ public class Peer2 {
                                         sendMessage(outMessage);
                                     }
                                 }
-                                //send own bitfield back to client peer
 
+                                //send own bitfield back to client peer
                                 //zero pad message length field if needed
                                 zero_pad = Integer.toString(bitfield.length() + 1);
                                 if(zero_pad.length() < 4){
@@ -503,7 +524,7 @@ public class Peer2 {
                                     }
                                 }
 
-                                outMessage = zero_pad + "7" + piece_to_send;
+                                outMessage = zero_pad + "7" + contents + piece_to_send;
                                 sendMessage(outMessage);
 
                                 zero_pad = "";
@@ -517,6 +538,10 @@ public class Peer2 {
                                 pieces.set(Integer.parseInt(index_contents), piece_contents);
 
                                 //send have message to connected peers, change contents of bitfield
+                                bitfield = bitfield.substring(0, Integer.parseInt(index_contents)) + "1" + bitfield.substring(Integer.parseInt(index_contents) + 1);
+
+                                outMessage = "00054" + index_contents;
+                                sendMessage(outMessage);
                             }
                             
                         } else {
