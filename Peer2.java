@@ -10,6 +10,7 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.Map;
 import java.lang.Math;
@@ -112,7 +113,7 @@ public class Peer2 {
             fileSpot = fileSpot + pieceSize;
         }
 
-        //we can delete this. just for visual confirmation
+        //for visual confirmation
         System.out.print("pieces: ");
         System.out.println(pieces);
         System.out.println("bitfield: " + bitfield);
@@ -160,210 +161,228 @@ public class Peer2 {
         }
 
         public void run() {
-            try {
-                //create a socket to connect to the server
-                requestSocket = new Socket(peerdest, peerPort);
-                System.out.println("Attempting to connect to "+ peerdest +" in "+ Integer.toString(peerPort) +" [Peer "+ peerID +"]");
+            while(true) {
+                try {
+                    //create a socket to connect to the server
+                    requestSocket = new Socket(peerdest, peerPort);
+                    System.out.println("Attempting to connect to "+ peerdest +" in "+ Integer.toString(peerPort) +" [Peer "+ peerID +"]");
 
-                //initialize input/output streams
-                out = new ObjectOutputStream(requestSocket.getOutputStream());
-                out.flush();
-                in = new ObjectInputStream(requestSocket.getInputStream());
-                boolean shake = false;
-                int length = 0;
-                String msg_type = "";
-                String contents = "";
-                String zero_pad = "";
-                int length_bytes = 0;
-                boolean sentInterest = false;
+                    //initialize input/output streams
+                    out = new ObjectOutputStream(requestSocket.getOutputStream());
+                    out.flush();
+                    in = new ObjectInputStream(requestSocket.getInputStream());
+                    boolean shake = false;
+                    int length = 0;
+                    String msg_type = "";
+                    String contents = "";
+                    String zero_pad = "";
+                    int length_bytes = 0;
+                    boolean sentInterest = false;
 
-                //send handshake message to peer I want to connect to
-                outMessage = "P2PFILESHARINGPROJ0000000000" + Integer.toString(myID);
-                sendMessage(outMessage);
-        
-                while(true) {
-                    //receive the message sent from the client
-                    inMessage = (String)in.readObject();
-                    //show the message to the user
-                    System.out.println("Receive message: " + inMessage + " from Peer " + peerID);
+                    //send handshake message to peer I want to connect to
+                    outMessage = "P2PFILESHARINGPROJ0000000000" + Integer.toString(myID);
+                    sendMessage(outMessage);
+            
+                    while(true) {
+                        //receive the message sent from the client
+                        inMessage = (String)in.readObject();
+                        //show the message to the user
+                        System.out.println("Receive message: " + inMessage + " from Peer " + peerID);
 
-                    //if statement determines if first message is handshake
-                    //if handshake was successful enter if
-                    if(shake) {
-                        // Delimit the message length and type from the received byte-string
-                        length = Integer.parseInt(inMessage.substring(0,4));
-                        msg_type = inMessage.substring(4,5);
-                        contents = inMessage.substring(5);
+                        //if statement determines if first message is handshake
+                        //if handshake was successful enter if
+                        if(shake) {
+                            // Delimit the message length and type from the received byte-string
+                            length = Integer.parseInt(inMessage.substring(0,4));
+                            msg_type = inMessage.substring(4,5);
+                            contents = inMessage.substring(5);
 
-                        // Choke --> 0
-                        if(msg_type.equals("0")) {}
-                            
-                        // Unchoke --> 1
-                        if(msg_type.equals("1")) {
-                            //server peer has unchoked this client peer because it has previously sent an interest
-                            //message to the server peer, begin sending requests to server
-                            
-                            //iterate through servers bitfield and own bitfield and get list of pieces needed
-                            List<Integer> neededFromServer = new ArrayList<Integer>();
-                            for(int i = 0; i < bitfield.length(); i++){
-                                if(Integer.parseInt(bitfield.substring(i, i+1)) < Integer.parseInt(peer_bits.get(peerID).substring(i, i+1))){
-                                    neededFromServer.add(i);
-                                }
-                            }
-
-                            int requested = (int) (Math.random() * neededFromServer.size());
-                            zero_pad = Integer.toString(neededFromServer.get(requested));
-
-                            //zero pad index field if needed
-                            if(zero_pad.length() < 4){
-                                length_bytes = zero_pad.length();
-                                for(int i = 0; i < (4 - length_bytes); i++){
-                                    zero_pad = "0" + zero_pad;
-                                }
-                            }
-
-                            //construct message, length will always be 5 for type + index
-                            outMessage = "00056" + zero_pad;
-                            sendMessage(outMessage);
-                            
-                            zero_pad = "";
-                        }
-
-                        // Interested --> 2
-                        if(msg_type.equals("2")) {
-                            //add peerID --> interest pair to map
-                            peer_interest.add(peerID);
-                        }
-                        // Not Interested --> 3
-                        if(msg_type.equals("3")) {
-                            //remove peer from list of interested peers
-                            if(peer_interest.contains(peerID)){
-                                peer_interest.remove(peerID);
-                            }
-                        }
-
-                        // Have --> 4
-                        if(msg_type.equals("4")) {
-                            //received have message from server peer, update their bitfield value in peer_bits hashmap
-                            String temp_field = peer_bits.get(peerID);
-                            temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
-
-                            //reevaluate interest???
-                        }
-
-                        // Bitfield --> 5
-                        if(msg_type.equals("5")) {
-                            //add peerID --> bitfield pair to map
-                            peer_bits.put(peerID, contents);
-
-                            //determine if server peer has pieces that client peer does not, then send
-                            //appropriate interest message
-                            if(peer_bits.get(peerID).equals(bitfield)){
-                                //bifields are equivalent, not interested
-                                outMessage = "00013";
-                                sendMessage(outMessage);
-                            }else{
-                                for(int i = 0; i < contents.length(); i++){
-                                    if(Integer.parseInt(contents.substring(i, i + 1)) > Integer.parseInt(bitfield.substring(i, i + 1))){
-                                        //peers bitfield has pieces that this bitfield lacks
-                                        outMessage = "00012";
-                                        sendMessage(outMessage);
-                                        sentInterest = true;
-                                        break;
+                            // Choke --> 0
+                            if(msg_type.equals("0")) {}
+                                
+                            // Unchoke --> 1
+                            if(msg_type.equals("1")) {
+                                //server peer has unchoked this client peer because it has previously sent an interest
+                                //message to the server peer, begin sending requests to server
+                                
+                                //iterate through servers bitfield and own bitfield and get list of pieces needed
+                                List<Integer> neededFromServer = new ArrayList<Integer>();
+                                for(int i = 0; i < bitfield.length(); i++){
+                                    if(Integer.parseInt(bitfield.substring(i, i+1)) < Integer.parseInt(peer_bits.get(peerID).substring(i, i+1))){
+                                        neededFromServer.add(i);
                                     }
                                 }
-                                //this bitfield has pieces that the peers bitfield lacks
-                                if(!sentInterest){
+
+                                int requested = (int) (Math.random() * neededFromServer.size());
+                                zero_pad = Integer.toString(neededFromServer.get(requested));
+
+                                //zero pad index field if needed
+                                if(zero_pad.length() < 4){
+                                    length_bytes = zero_pad.length();
+                                    for(int i = 0; i < (4 - length_bytes); i++){
+                                        zero_pad = "0" + zero_pad;
+                                    }
+                                }
+
+                                //construct message, length will always be 5 for type + index
+                                outMessage = "00056" + zero_pad;
+                                sendMessage(outMessage);
+                                
+                                zero_pad = "";
+                            }
+
+                            // Interested --> 2
+                            if(msg_type.equals("2")) {
+                                //add peerID --> interest pair to map
+                                peer_interest.add(peerID);
+                            }
+                            // Not Interested --> 3
+                            if(msg_type.equals("3")) {
+                                //remove peer from list of interested peers
+                                if(peer_interest.contains(peerID)){
+                                    peer_interest.remove(peerID);
+                                }
+                            }
+
+                            // Have --> 4
+                            if(msg_type.equals("4")) {
+                                //received have message from server peer, update their bitfield value in peer_bits hashmap
+                                String temp_field = peer_bits.get(peerID);
+                                temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
+
+                                //reevaluate interest???
+                            }
+
+                            // Bitfield --> 5
+                            if(msg_type.equals("5")) {
+                                //add peerID --> bitfield pair to map
+                                peer_bits.put(peerID, contents);
+
+                                //determine if server peer has pieces that client peer does not, then send
+                                //appropriate interest message
+                                if(peer_bits.get(peerID).equals(bitfield)){
+                                    //bifields are equivalent, not interested
                                     outMessage = "00013";
                                     sendMessage(outMessage);
+                                }else{
+                                    for(int i = 0; i < contents.length(); i++){
+                                        if(Integer.parseInt(contents.substring(i, i + 1)) > Integer.parseInt(bitfield.substring(i, i + 1))){
+                                            //peers bitfield has pieces that this bitfield lacks
+                                            outMessage = "00012";
+                                            sendMessage(outMessage);
+                                            sentInterest = true;
+                                            break;
+                                        }
+                                    }
+                                    //this bitfield has pieces that the peers bitfield lacks
+                                    if(!sentInterest){
+                                        outMessage = "00013";
+                                        sendMessage(outMessage);
+                                    }
                                 }
                             }
-                        }
-                        // Request --> 6
-                        if(msg_type.equals("6")) {
-                            //client peer receieved request for one of its pieces from server peer
-                            //read bytes from file
-                            String piece_to_send = pieces.get(Integer.parseInt(contents));
+                            // Request --> 6
+                            if(msg_type.equals("6")) {
+                                //client peer receieved request for one of its pieces from server peer
+                                //read bytes from file
+                                String piece_to_send = pieces.get(Integer.parseInt(contents));
 
-                            //zero pad length field if needed
-                            zero_pad = Integer.toString(piece_to_send.length() + 1);
-                            if(zero_pad.length() < 4){
-                                length_bytes = zero_pad.length();
-                                for(int i = 0; i < (4 - length_bytes); i++){
-                                    zero_pad = "0" + zero_pad;
+                                //zero pad length field if needed
+                                zero_pad = Integer.toString(piece_to_send.length() + 1);
+                                if(zero_pad.length() < 4){
+                                    length_bytes = zero_pad.length();
+                                    for(int i = 0; i < (4 - length_bytes); i++){
+                                        zero_pad = "0" + zero_pad;
+                                    }
                                 }
+
+                                outMessage = zero_pad + "7" + contents + piece_to_send;
+                                sendMessage(outMessage);
+
+                                zero_pad = "";
                             }
 
-                            outMessage = zero_pad + "7" + contents + piece_to_send;
-                            sendMessage(outMessage);
+                            // Piece --> 7
+                            if(msg_type.equals("7")) {
+                                //client received a requested piece from the server, store in pieces arrraylist
+                                String index_contents = contents.substring(0,4);
+                                String piece_contents = contents.substring(4, contents.length());
+                                pieces.set(Integer.parseInt(index_contents), piece_contents);
+                                System.out.println("Piece obtained: " + piece_contents);
 
-                            zero_pad = "";
-                        }
+                                //send have message to connected peers, change contents of bitfield
+                                bitfield = bitfield.substring(0, Integer.parseInt(index_contents)) + "1" + bitfield.substring(Integer.parseInt(index_contents) + 1);
 
-                        // Piece --> 7
-                        if(msg_type.equals("7")) {
-                            //client received a requested piece from the server, store in pieces arrraylist
-                            String index_contents = contents.substring(0,4);
-                            String piece_contents = contents.substring(4, contents.length());
-                            pieces.set(Integer.parseInt(index_contents), piece_contents);
-                            System.out.println("Piece obtained: " + piece_contents);
+                                outMessage = "00054" + index_contents;
+                                sendMessage(outMessage);
 
-                            //send have message to connected peers, change contents of bitfield
-                            bitfield = bitfield.substring(0, Integer.parseInt(index_contents)) + "1" + bitfield.substring(Integer.parseInt(index_contents) + 1);
-
-                            outMessage = "00054" + index_contents;
-                            sendMessage(outMessage);
-
-                        }
-
-                    } else {
-                        //if first message is P2P, handshake is successful 
-                        if((inMessage.substring(0, 18)).equals("P2PFILESHARINGPROJ")) {
-                            System.out.println("Handshake with peer " + Integer.toString(peerID) + " successful");
-                            shake = true;
-                            //send bitfield message to new peer connection to be used in establishing piece interest
-                            
-                            //zero pad length field if needed
-                            zero_pad = Integer.toString(bitfield.length() + 1);
-                            if(zero_pad.length() < 4){
-                                length_bytes = zero_pad.length();
-                                for(int i = 0; i < (4 - length_bytes); i++){
-                                    zero_pad = "0" + zero_pad;
-                                }
                             }
-                            
-                            outMessage = zero_pad + "5" + bitfield;
-                            sendMessage(outMessage);
 
-                            zero_pad = "";
-
-                        //otherwise bad handshake and disconnect
                         } else {
-                            System.out.println("bad handshake");
-                            outMessage= "bad handshake";
-                            sendMessage(outMessage);
-                            break;
+                            //if first message is P2P, handshake is successful 
+                            if((inMessage.substring(0, 18)).equals("P2PFILESHARINGPROJ")) {
+                                System.out.println("Handshake with peer " + Integer.toString(peerID) + " successful");
+                                shake = true;
+                                //send bitfield message to new peer connection to be used in establishing piece interest
+                                
+                                //zero pad length field if needed
+                                zero_pad = Integer.toString(bitfield.length() + 1);
+                                if(zero_pad.length() < 4){
+                                    length_bytes = zero_pad.length();
+                                    for(int i = 0; i < (4 - length_bytes); i++){
+                                        zero_pad = "0" + zero_pad;
+                                    }
+                                }
+                                
+                                outMessage = zero_pad + "5" + bitfield;
+                                sendMessage(outMessage);
+
+                                zero_pad = "";
+
+                            //otherwise bad handshake and disconnect
+                            } else {
+                                System.out.println("bad handshake");
+                                outMessage= "bad handshake";
+                                sendMessage(outMessage);
+                                break;
+                            }
                         }
                     }
-                }
-            } catch(ConnectException e) {
-                System.err.println("Connection refused. You need to initiate a server first.");
-            } catch(ClassNotFoundException e) {
-                System.err.println("Class not found");
-            } catch (UnknownHostException unknownHost) {
-                System.err.println("You are trying to connect to an unknown host!");
-            } catch(IOException ioException) {
-                ioException.printStackTrace();
-            } finally {
-                //Close connections
-                try {
-                    in.close();
-                    out.close();
-                    requestSocket.close();
-                    System.out.println("Disconnected with Server");
+                } catch(ConnectException e) {
+                    System.err.println("Peer "+ Integer.toString(peerID) +" hasn't been initiated. Attempting to reconnect!");
+                } catch(ClassNotFoundException e) {
+                    System.err.println("Class not found");
+                } catch (UnknownHostException unknownHost) {
+                    System.err.println("You are trying to connect to an unknown host!");
                 } catch(IOException ioException) {
                     ioException.printStackTrace();
+                } finally {
+                    //Close connections
+                    try {
+                        if(in != null)
+                        in.close();
+                    
+                        if(out != null)
+                            out.close();
+
+                        if(requestSocket != null) {
+                            requestSocket.close();
+                            System.out.println("Disconnected with Server");
+                        }
+                    } catch(IOException ioException) {
+                        ioException.printStackTrace();
+                    }
                 }
+                timedDelay(5);
+            }
+        }
+
+        public void timedDelay(int secondsToSleep) {
+            //this.secondsToSleep = secondsToSleep;
+            try {
+                TimeUnit.SECONDS.sleep(secondsToSleep);
+            } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
             }
         }
 
