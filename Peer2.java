@@ -21,7 +21,7 @@ import java.lang.Math;
 public class Peer2 {
 
     //this is just for testing we will need to change this later to project specifications
-    private static final int myID = 1002;   //The peer will have this ID
+    private static final int myID = 1001;   //The peer will have this ID
     public static String bitfield = "";
     public static HashMap<Integer, String> peer_bits = new HashMap<Integer, String>();
     public static List<Integer> peer_interest = new ArrayList<Integer>();
@@ -45,6 +45,7 @@ public class Peer2 {
 
         //This block of code reads in the peer info file, splits each line into a list of string arrays, determines peers with lower ids
         int sPort = 0;
+        int hasFile = 0;
         List<String[]> peerList = new ArrayList<String[]>();
         try {
             File myObj = new File("PeerInfo.cfg");
@@ -57,6 +58,8 @@ public class Peer2 {
 
                 if (peerID == myID) {
                     sPort = Integer.parseInt(peerData[2]);
+                    if(Integer.parseInt(peerData[3]) == 1)
+                        hasFile = 1;
                 }
                 //if peer id is lower than ours add it to arraylist
                 //each line is put into array split by spaces
@@ -105,30 +108,34 @@ public class Peer2 {
         int fileSize = Integer.parseInt(metadata.get("FileSize"));
         int pieceSize = Integer.parseInt(metadata.get("PieceSize"));
         int fileSpot = 0;
-        for(int i = 0; i < Math.ceil(Double.valueOf(fileSize) / Double.valueOf(pieceSize)); i++) {
-            try {
-                String temp = fileData.substring(fileSpot, fileSpot + pieceSize);
-                temp = temp.trim();
-                if(temp.length() == 0) {
-                    pieces.add(fileData.substring(fileSpot, fileSpot + pieceSize));
-                    bitfield = bitfield + "0";
-                } else {
-                    pieces.add(fileData.substring(fileSpot, fileSpot + pieceSize));
-                    bitfield = bitfield + "1";
+        if(hasFile == 1) {
+            for(int i = 0; i < Math.ceil(Double.valueOf(fileSize) / Double.valueOf(pieceSize)); i++) {
+                try {
+                    String temp = fileData.substring(fileSpot, fileSpot + pieceSize);
+                    temp = temp.trim();
+                    if(temp.length() == 0) {
+                        pieces.add(fileData.substring(fileSpot, fileSpot + pieceSize));
+                    } else {
+                        pieces.add(fileData.substring(fileSpot, fileSpot + pieceSize));
+                    }
+                } catch(StringIndexOutOfBoundsException e) {
+                    String temp = fileData.substring(fileSpot);
+                    temp = temp.trim();
+                    if(temp.length() == 0) {
+                        pieces.add(fileData.substring(fileSpot));
+                    } else {
+                        pieces.add(fileData.substring(fileSpot));
+                    }
                 }
-            } catch(StringIndexOutOfBoundsException e) {
-                String temp = fileData.substring(fileSpot);
-                temp = temp.trim();
-                if(temp.length() == 0) {
-                    pieces.add(fileData.substring(fileSpot));
-                    bitfield = bitfield + "0";
-                } else {
-                    pieces.add(fileData.substring(fileSpot));
-                    bitfield = bitfield + "1";
-                }
+                bitfield = bitfield + "1";
+                fileSpot = fileSpot + pieceSize;
             }
-            
-            fileSpot = fileSpot + pieceSize;
+        } else {
+            for(int i = 0; i < Math.ceil(Double.valueOf(fileSize) / Double.valueOf(pieceSize)); i++) {
+                bitfield = bitfield + "0";
+                pieces.add("");
+                fileSpot = fileSpot + pieceSize;
+            }
         }
 
         //for visual confirmation
@@ -218,9 +225,9 @@ public class Peer2 {
                             // Choke --> 0
                             if(msg_type.equals("0")) {
                                 //write to log file
-                                timeNow = LocalTime.now();
-                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] is choked by ["+ Integer.toString(peerID) +"]");
-                                logger.close();
+                                //timeNow = LocalTime.now();
+                                //logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] is choked by ["+ Integer.toString(peerID) +"]");
+                                //logger.close();
                             }
                                 
                             // Unchoke --> 1
@@ -254,9 +261,9 @@ public class Peer2 {
                                 zero_pad = "";
 
                                 //write to log file
-                                timeNow = LocalTime.now();
-                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] is unchoked by ["+ Integer.toString(peerID) +"]");
-                                logger.close();
+                                //timeNow = LocalTime.now();
+                                //logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] is unchoked by ["+ Integer.toString(peerID) +"]");
+                                //logger.close();
                             }
 
                             // Interested --> 2
@@ -265,9 +272,9 @@ public class Peer2 {
                                 peer_interest.add(peerID);
 
                                 //write to log file
-                                timeNow = LocalTime.now();
-                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘interested’ message from ["+ Integer.toString(peerID) +"]");
-                                logger.close();
+                                //timeNow = LocalTime.now();
+                                //logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘interested’ message from ["+ Integer.toString(peerID) +"]");
+                                //logger.close();
                             }
                             // Not Interested --> 3
                             if(msg_type.equals("3")) {
@@ -277,9 +284,9 @@ public class Peer2 {
                                 }
 
                                 //write to log file
-                                timeNow = LocalTime.now();
-                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘not interested’ message from ["+ Integer.toString(peerID) +"]");
-                                logger.close();
+                                //timeNow = LocalTime.now();
+                                //logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘not interested’ message from ["+ Integer.toString(peerID) +"]");
+                                //logger.close();
                             }
 
                             // Have --> 4
@@ -493,9 +500,9 @@ public class Peer2 {
                                 //unchoked neighbor
 
                                 //write to log file
-                                timeNow = LocalTime.now();
-                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] is choked by ["+ Integer.toString(peerID) +"]");
-                                logger.close();
+                                //timeNow = LocalTime.now();
+                                //logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] is choked by ["+ Integer.toString(peerID) +"]");
+                                //logger.close();
                             }
                                 
                             // Unchoke --> 1
@@ -529,9 +536,9 @@ public class Peer2 {
                                 zero_pad = "";
 
                                 //write to log file
-                                timeNow = LocalTime.now();
-                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] is unchoked by ["+ Integer.toString(peerID) +"]");
-                                logger.close();
+                                //timeNow = LocalTime.now();
+                                //logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] is unchoked by ["+ Integer.toString(peerID) +"]");
+                                //logger.close();
                             }
 
                             // Interested --> 2
@@ -542,9 +549,9 @@ public class Peer2 {
                                 sendMessage(outMessage);
 
                                 //write to log file
-                                timeNow = LocalTime.now();
-                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘interested’ message from ["+ Integer.toString(peerID) +"]");
-                                logger.close();
+                                //timeNow = LocalTime.now();
+                                //logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘interested’ message from ["+ Integer.toString(peerID) +"]");
+                                //logger.close();
                             }
                             // Not Interested --> 3
                             if(msg_type.equals("3")) {
@@ -554,9 +561,9 @@ public class Peer2 {
                                 }
 
                                 //write to log file
-                                timeNow = LocalTime.now();
-                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘not interested’ message from ["+ Integer.toString(peerID) +"]");
-                                logger.close();
+                                //timeNow = LocalTime.now();
+                                //logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘not interested’ message from ["+ Integer.toString(peerID) +"]");
+                                //logger.close();
                             }
                             // Have --> 4
                             if(msg_type.equals("4")) {
@@ -567,9 +574,9 @@ public class Peer2 {
                                 //reevaluate interest???
 
                                 //write to log file
-                                timeNow = LocalTime.now();
-                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘have’ message from ["+ Integer.toString(peerID) +"] for the piece [piece index]");
-                                logger.close();
+                                //timeNow = LocalTime.now();
+                                //logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘have’ message from ["+ Integer.toString(peerID) +"] for the piece [piece index]");
+                                //logger.close();
                             }
 
                             // Bitfield --> 5
