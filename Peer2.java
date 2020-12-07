@@ -21,7 +21,7 @@ import java.lang.Math;
 public class Peer2 {
 
     //this is just for testing we will need to change this later to project specifications
-    private static final int myID = 1001;   //The peer will have this ID
+    private static final int myID = 1003;   //The peer will have this ID
     public static String bitfield = "";
     public static HashMap<Integer, String> peer_bits = new HashMap<Integer, String>();
     public static List<Integer> peer_interest = new ArrayList<Integer>();
@@ -155,12 +155,10 @@ public class Peer2 {
         //Here we begin handling our peers who connect to us
 		System.out.println("The Peer"+ myID +" is running."); 
         ServerSocket listener = new ServerSocket(sPort);
-		//int clientNum = 1;
         try {
         	while(true) {
             	new Handler(listener.accept()).start();
 	    		System.out.println("Someone is attempting to connect!");
-		    	//clientNum++;
     		}
         } finally {
     		listener.close();
@@ -225,9 +223,8 @@ public class Peer2 {
                             // Choke --> 0
                             if(msg_type.equals("0")) {
                                 //write to log file
-                                //timeNow = LocalTime.now();
-                                //logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] is choked by ["+ Integer.toString(peerID) +"]");
-                                //logger.close();
+                                timeNow = LocalTime.now();
+                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] is choked by ["+ Integer.toString(peerID) +"]\n");
                             }
                                 
                             // Unchoke --> 1
@@ -261,9 +258,8 @@ public class Peer2 {
                                 zero_pad = "";
 
                                 //write to log file
-                                //timeNow = LocalTime.now();
-                                //logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] is unchoked by ["+ Integer.toString(peerID) +"]");
-                                //logger.close();
+                                timeNow = LocalTime.now();
+                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] is unchoked by ["+ Integer.toString(peerID) +"]\n");
                             }
 
                             // Interested --> 2
@@ -272,9 +268,8 @@ public class Peer2 {
                                 peer_interest.add(peerID);
 
                                 //write to log file
-                                //timeNow = LocalTime.now();
-                                //logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘interested’ message from ["+ Integer.toString(peerID) +"]");
-                                //logger.close();
+                                timeNow = LocalTime.now();
+                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘interested’ message from ["+ Integer.toString(peerID) +"]\n");
                             }
                             // Not Interested --> 3
                             if(msg_type.equals("3")) {
@@ -284,9 +279,8 @@ public class Peer2 {
                                 }
 
                                 //write to log file
-                                //timeNow = LocalTime.now();
-                                //logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘not interested’ message from ["+ Integer.toString(peerID) +"]");
-                                //logger.close();
+                                timeNow = LocalTime.now();
+                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘not interested’ message from ["+ Integer.toString(peerID) +"]\n");
                             }
 
                             // Have --> 4
@@ -371,8 +365,8 @@ public class Peer2 {
 
                                 //write to log file
                                 timeNow = LocalTime.now();
-                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] makes a connection to Peer ["+ Integer.toString(peerID) +"]");
-                                logger.close();
+                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] makes a connection to Peer ["+ Integer.toString(peerID) +"]\n");
+                                //logger.close();
 
                                 //send bitfield message to new peer connection to be used in establishing piece interest
                                 //zero pad length field if needed
@@ -416,6 +410,7 @@ public class Peer2 {
                             out.close();
 
                         if(requestSocket != null) {
+                            logger.close();
                             requestSocket.close();
                             System.out.println("Disconnected with Server");
                         }
@@ -500,9 +495,8 @@ public class Peer2 {
                                 //unchoked neighbor
 
                                 //write to log file
-                                //timeNow = LocalTime.now();
-                                //logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] is choked by ["+ Integer.toString(peerID) +"]");
-                                //logger.close();
+                                timeNow = LocalTime.now();
+                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] is choked by ["+ Integer.toString(peerID) +"]\n");
                             }
                                 
                             // Unchoke --> 1
@@ -536,9 +530,8 @@ public class Peer2 {
                                 zero_pad = "";
 
                                 //write to log file
-                                //timeNow = LocalTime.now();
-                                //logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] is unchoked by ["+ Integer.toString(peerID) +"]");
-                                //logger.close();
+                                timeNow = LocalTime.now();
+                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] is unchoked by ["+ Integer.toString(peerID) +"]\n");
                             }
 
                             // Interested --> 2
@@ -549,9 +542,8 @@ public class Peer2 {
                                 sendMessage(outMessage);
 
                                 //write to log file
-                                //timeNow = LocalTime.now();
-                                //logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘interested’ message from ["+ Integer.toString(peerID) +"]");
-                                //logger.close();
+                                timeNow = LocalTime.now();
+                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘interested’ message from ["+ Integer.toString(peerID) +"]\n");
                             }
                             // Not Interested --> 3
                             if(msg_type.equals("3")) {
@@ -561,9 +553,8 @@ public class Peer2 {
                                 }
 
                                 //write to log file
-                                //timeNow = LocalTime.now();
-                                //logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘not interested’ message from ["+ Integer.toString(peerID) +"]");
-                                //logger.close();
+                                timeNow = LocalTime.now();
+                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘not interested’ message from ["+ Integer.toString(peerID) +"]\n");
                             }
                             // Have --> 4
                             if(msg_type.equals("4")) {
@@ -574,9 +565,8 @@ public class Peer2 {
                                 //reevaluate interest???
 
                                 //write to log file
-                                //timeNow = LocalTime.now();
-                                //logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘have’ message from ["+ Integer.toString(peerID) +"] for the piece [piece index]");
-                                //logger.close();
+                                timeNow = LocalTime.now();
+                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘have’ message from ["+ Integer.toString(peerID) +"] for the piece [piece index]\n");
                             }
 
                             // Bitfield --> 5
@@ -591,7 +581,7 @@ public class Peer2 {
                                     //bifields are equivalent, not interested
                                     outMessage = "00013";
                                     sendMessage(outMessage);
-                                }else{
+                                } else {
                                     for(int i = 0; i < contents.length(); i++){
                                         if(Integer.parseInt(contents.substring(i, i + 1)) > Integer.parseInt(bitfield.substring(i, i + 1))){
                                             //peers bitfield has pieces that this bitfield lacks
@@ -669,8 +659,7 @@ public class Peer2 {
 
                                 //write to log file
                                 timeNow = LocalTime.now();
-                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] is connected from Peer ["+ Integer.toString(peerID) +"]");
-                                logger.close();
+                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] is connected from Peer ["+ Integer.toString(peerID) +"]\n");
 
                                 //return handshake
                                 outMessage = "P2PFILESHARINGPROJ0000000000" + Integer.toString(myID);
@@ -698,6 +687,7 @@ public class Peer2 {
                     in.close();
                     out.close();
                     connection.close();
+                    logger.close();
                     System.out.println("Disconnect with Client");
                 } catch(IOException ioException) {
                     System.out.println("Disconnect with Client");
