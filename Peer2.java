@@ -21,7 +21,7 @@ import java.lang.Math;
 public class Peer2 {
 
     //this is just for testing we will need to change this later to project specifications
-    private static final int myID = 1003;   //The peer will have this ID
+    private static final int myID = 1002;   //The peer will have this ID
     public static String bitfield = "";
     public static HashMap<Integer, String> peer_bits = new HashMap<Integer, String>();
     public static List<Integer> peer_interest = new ArrayList<Integer>();
@@ -360,29 +360,30 @@ public class Peer2 {
                         } else {
                             //if first message is P2P, handshake is successful 
                             if((inMessage.substring(0, 18)).equals("P2PFILESHARINGPROJ")) {
-                                System.out.println("Handshake with peer " + Integer.toString(peerID) + " successful");
-                                shake = true;
-
-                                //write to log file
-                                timeNow = LocalTime.now();
-                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] makes a connection to Peer ["+ Integer.toString(peerID) +"]\n");
-                                //logger.close();
-
-                                //send bitfield message to new peer connection to be used in establishing piece interest
-                                //zero pad length field if needed
-                                zero_pad = Integer.toString(bitfield.length() + 1);
-                                if(zero_pad.length() < 4){
-                                    length_bytes = zero_pad.length();
-                                    for(int i = 0; i < (4 - length_bytes); i++){
-                                        zero_pad = "0" + zero_pad;
+                                if(peerID == Integer.parseInt(inMessage.substring(inMessage.length() - 4))) {
+                                    System.out.println("Handshake with peer " + Integer.toString(peerID) + " successful");
+                                    shake = true;
+    
+                                    //write to log file
+                                    timeNow = LocalTime.now();
+                                    logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] makes a connection to Peer ["+ Integer.toString(peerID) +"]\n");
+                                    //logger.close();
+    
+                                    //send bitfield message to new peer connection to be used in establishing piece interest
+                                    //zero pad length field if needed
+                                    zero_pad = Integer.toString(bitfield.length() + 1);
+                                    if(zero_pad.length() < 4){
+                                        length_bytes = zero_pad.length();
+                                        for(int i = 0; i < (4 - length_bytes); i++){
+                                            zero_pad = "0" + zero_pad;
+                                        }
                                     }
+                                    
+                                    outMessage = zero_pad + "5" + bitfield;
+                                    sendMessage(outMessage);
+    
+                                    zero_pad = "";
                                 }
-                                
-                                outMessage = zero_pad + "5" + bitfield;
-                                sendMessage(outMessage);
-
-                                zero_pad = "";
-
                             //otherwise bad handshake and disconnect
                             } else {
                                 System.out.println("bad handshake");
