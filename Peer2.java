@@ -21,7 +21,7 @@ import java.lang.Math;
 public class Peer2 {
 
     //this is just for testing we will need to change this later to project specifications
-    private static final int myID = 1003;   //The peer will have this ID
+    private static final int myID = 1001;   //The peer will have this ID
     public static String bitfield = "";
     public static HashMap<Integer, String> peer_bits = new HashMap<Integer, String>();
     public static List<Integer> peer_interest = new ArrayList<Integer>();
@@ -33,11 +33,11 @@ public class Peer2 {
 	public static void main(String[] args) throws Exception {
         //creating log file
         try {
-        String logger_path = "project/log_peer_"+ Integer.toString(myID) +".log";
-        File myObj1 = new File(logger_path);
-        myObj1.getParentFile().mkdirs(); 
-        myObj1.createNewFile();
-        logger = new FileWriter(logger_path);
+            String logger_path = "project/log_peer_"+ Integer.toString(myID) +".log";
+            File myObj1 = new File(logger_path);
+            myObj1.getParentFile().mkdirs(); 
+            myObj1.createNewFile();
+            logger = new FileWriter(logger_path);
         } catch(IOException e) {
             System.out.println("An error ocurred");
             System.out.println(e);
@@ -195,6 +195,7 @@ public class Peer2 {
                     out.flush();
                     in = new ObjectInputStream(requestSocket.getInputStream());
                     boolean shake = false;
+                    boolean choked = true;
                     int length = 0;
                     String msg_type = "";
                     String contents = "";
@@ -222,6 +223,8 @@ public class Peer2 {
 
                             // Choke --> 0
                             if(msg_type.equals("0")) {
+                                //set choke status
+                                choked = true;
                                 //write to log file
                                 timeNow = LocalTime.now();
                                 logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] is choked by ["+ Integer.toString(peerID) +"]\n");
@@ -231,6 +234,9 @@ public class Peer2 {
                             if(msg_type.equals("1")) {
                                 //server peer has unchoked this client peer because it has previously sent an interest
                                 //message to the server peer, begin sending requests to server
+
+                                //set choke status
+                                choked = false;
                                 
                                 //iterate through servers bitfield and own bitfield and get list of pieces needed
                                 List<Integer> neededFromServer = new ArrayList<Integer>();
@@ -275,7 +281,7 @@ public class Peer2 {
                             if(msg_type.equals("3")) {
                                 //remove peer from list of interested peers
                                 if(peer_interest.contains(peerID)){
-                                    peer_interest.remove(peerID);
+                                    peer_interest.remove(peer_interest.indexOf(peerID));
                                 }
 
                                 //write to log file
@@ -288,8 +294,30 @@ public class Peer2 {
                                 //received have message from server peer, update their bitfield value in peer_bits hashmap
                                 String temp_field = peer_bits.get(peerID);
                                 temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
+                                peer_bits.put(peerID, temp_field);
 
-                                //reevaluate interest???
+                                //reevaluate interest
+                                //determine if server peer has pieces that client peer does not, then send
+                                //appropriate interest message
+                                if(peer_interest.contains(peerID)){
+                                    if(peer_bits.get(peerID).equals(bitfield)){
+                                        //bifields are equivalent, not interested
+                                        peer_interest.remove(peer_interest.indexOf(peerID));
+                                        choked = true;
+                                    }else {
+                                        for(int i = 0; i < bitfield.length(); i++){
+                                            if(Integer.parseInt(peer_bits.get(peerID).substring(i, i + 1)) > Integer.parseInt(bitfield.substring(i, i + 1))){
+                                                //peers bitfield has pieces that this bitfield lacks
+                                                if(!peer_interest.contains(peerID)){
+                                                    peer_interest.add(peerID);
+                                                }
+                                                outMessage = "00012";
+                                                sendMessage(outMessage);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
                             }
 
                             // Bitfield --> 5
@@ -355,6 +383,35 @@ public class Peer2 {
                                 outMessage = "00054" + index_contents;
                                 sendMessage(outMessage);
 
+                                //iterate through servers bitfield and own bitfield and get list of pieces still needed
+                                List<Integer> neededFromServer = new ArrayList<Integer>();
+                                for(int i = 0; i < bitfield.length(); i++){
+                                    if(Integer.parseInt(bitfield.substring(i, i+1)) < Integer.parseInt(peer_bits.get(peerID).substring(i, i+1))){
+                                        neededFromServer.add(i);
+                                    }
+                                }
+
+                                //request new piece if there are more that can be transferred
+                                if((neededFromServer.size() != 0) && (choked == false)){
+                                    int requested = (int) (Math.random() * neededFromServer.size());
+                                    zero_pad = Integer.toString(neededFromServer.get(requested));
+
+                                    //zero pad index field if needed
+                                    if(zero_pad.length() < 4){
+                                        length_bytes = zero_pad.length();
+                                        for(int i = 0; i < (4 - length_bytes); i++){
+                                            zero_pad = "0" + zero_pad;
+                                        }
+                                    }
+
+                                    //construct message, length will always be 5 for type + index
+                                    outMessage = "00056" + zero_pad;
+                                    sendMessage(outMessage);
+                                    
+                                    zero_pad = "";
+                                }else{
+                                    //end requesting loop, no more pieces needed from this server
+                                }
                             }
 
                         } else {
@@ -466,6 +523,7 @@ public class Peer2 {
                 out.flush();
                 in = new ObjectInputStream(connection.getInputStream());
                 boolean shake = false;
+                boolean choked = true;
                 String msg_type = "";
                 int length = 0;
                 String contents = "";
@@ -493,6 +551,7 @@ public class Peer2 {
                             if(msg_type.equals("0")) {
                                 //client peer has choked this server peer because it is not a preferred neighbor or optimistically
                                 //unchoked neighbor
+                                choked = true;
 
                                 //write to log file
                                 timeNow = LocalTime.now();
@@ -503,6 +562,7 @@ public class Peer2 {
                             if(msg_type.equals("1")) {
                                 //client peer has unchoked this server peer because it has previously sent an interest
                                 //message to the client peer, begin sending requests to client
+                                choked = false;
                                 
                                 //iterate through servers bitfield and own bitfield and get list of pieces needed
                                 List<Integer> neededFromClient = new ArrayList<Integer>();
@@ -549,7 +609,7 @@ public class Peer2 {
                             if(msg_type.equals("3")) {
                                 //remove peer from list of interested peers
                                 if(peer_interest.contains(peerID)){
-                                    peer_interest.remove(peerID);
+                                    peer_interest.remove(peer_interest.indexOf(peerID));
                                 }
 
                                 //write to log file
@@ -561,8 +621,31 @@ public class Peer2 {
                                 //received have message from client peer, update their bitfield value in peer_bits hashmap
                                 String temp_field = peer_bits.get(peerID);
                                 temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
+                                peer_bits.put(peerID, temp_field);
 
-                                //reevaluate interest???
+                                //reevaluate interest
+                                //determine if server peer has pieces that client peer does not, then send
+                                //appropriate interest message
+                                if(peer_interest.contains(peerID)){
+                                    if(peer_bits.get(peerID).equals(bitfield)){
+                                        //bifields are equivalent, not interested
+
+                                        peer_interest.remove(peer_interest.indexOf(peerID));
+                                        choked = true;
+                                    }else {
+                                        for(int i = 0; i < bitfield.length(); i++){
+                                            if(Integer.parseInt(peer_bits.get(peerID).substring(i, i + 1)) > Integer.parseInt(bitfield.substring(i, i + 1))){
+                                                //peers bitfield has pieces that this bitfield lacks
+                                                if(!peer_interest.contains(peerID)){
+                                                    peer_interest.add(peerID);
+                                                }
+                                                outMessage = "00012";
+                                                sendMessage(outMessage);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
 
                                 //write to log file
                                 timeNow = LocalTime.now();
