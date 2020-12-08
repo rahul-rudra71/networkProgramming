@@ -21,7 +21,7 @@ import java.lang.Math;
 public class Peer2 {
 
     //this is just for testing we will need to change this later to project specifications
-    private static final int myID = 1001;   //The peer will have this ID
+    private static final int myID = 1003;   //The peer will have this ID
     public static String bitfield = "";
     public static HashMap<Integer, String> peer_bits = new HashMap<Integer, String>();
     public static List<Integer> peer_interest = new ArrayList<Integer>();
@@ -63,6 +63,8 @@ public class Peer2 {
                     sPort = Integer.parseInt(peerData[2]);
                     if(Integer.parseInt(peerData[3]) == 1)
                         hasFile = 1;
+                } else {
+                    peer_bits.put(peerID, peerData[3]);
                 }
                 //if peer id is lower than ours add it to arraylist
                 //each line is put into array split by spaces
@@ -141,6 +143,20 @@ public class Peer2 {
             }
         }
 
+        //creating everyone's bitfields
+        for(HashMap.Entry<Integer, String> poop : peer_bits.entrySet()) {
+            if( (poop.getValue()).equals("0") ) {
+                for(int i = 0; i < bitfield.length() -1; i++) {
+                    peer_bits.put(poop.getKey(), poop.getValue() + "0");
+                }
+            } else {
+                for(int i = 0; i < bitfield.length() -1; i++) {
+                    peer_bits.put(poop.getKey(), poop.getValue() + "1");
+                }
+            }
+            System.out.println(poop.getKey() + " = " + poop.getValue());
+        }
+
         //for visual confirmation
         System.out.print("pieces: ");
         System.out.println(pieces);
@@ -208,6 +224,7 @@ public class Peer2 {
                     in = new ObjectInputStream(requestSocket.getInputStream());
                     boolean shake = false;
                     boolean choked = true;
+                    boolean terminado = false;
                     int length = 0;
                     String msg_type = "";
                     String contents = "";
@@ -307,6 +324,19 @@ public class Peer2 {
                                 String temp_field = peer_bits.get(peerID);
                                 temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
                                 peer_bits.put(peerID, temp_field);
+
+                                //determine whether it is time to terminate
+                                System.out.println(peer_bits);
+                                for(HashMap.Entry<Integer, String> poop : peer_bits.entrySet()) {
+                                    if( (poop.getValue()).contains("0") || bitfield.contains("0")) {
+                                        terminado = false;
+                                        break;
+                                    } 
+                                    terminado = true;
+                                }
+                                if(terminado) {
+                                    System.out.println("Terminado");
+                                }
 
                                 //reevaluate interest
                                 //determine if server peer has pieces that client peer does not, then send
@@ -552,6 +582,7 @@ public class Peer2 {
                 in = new ObjectInputStream(connection.getInputStream());
                 boolean shake = false;
                 boolean choked = true;
+                boolean terminado = false;
                 String msg_type = "";
                 int length = 0;
                 String contents = "";
@@ -650,6 +681,19 @@ public class Peer2 {
                                 String temp_field = peer_bits.get(peerID);
                                 temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
                                 peer_bits.put(peerID, temp_field);
+
+                                //determine whether it is time to terminate
+                                System.out.println(peer_bits);
+                                for(HashMap.Entry<Integer, String> poop : peer_bits.entrySet()) {
+                                    if( (poop.getValue()).contains("0") || bitfield.contains("0")) {
+                                        terminado = false;
+                                        break;
+                                    } 
+                                    terminado = true;
+                                }
+                                if(terminado) {
+                                    System.out.println("Terminado!");
+                                }
 
                                 //reevaluate interest
                                 //determine if server peer has pieces that client peer does not, then send
