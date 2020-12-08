@@ -21,7 +21,7 @@ import java.lang.Math;
 public class Peer2 {
 
     //this is just for testing we will need to change this later to project specifications
-    private static final int myID = 1002;   //The peer will have this ID
+    private static final int myID = 1001;   //The peer will have this ID
     public static String bitfield = "";
     public static HashMap<Integer, String> peer_bits = new HashMap<Integer, String>();
     public static List<Integer> peer_interest = new ArrayList<Integer>();
@@ -30,6 +30,9 @@ public class Peer2 {
     public static FileWriter logger;
     public static LocalTime timeNow;
     public static DateTimeFormatter timeFormat = DateTimeFormatter.ofPattern("HH:mm:ss");
+
+    public static List<peerHandler> allConnected_peer = new ArrayList<peerHandler>();
+    public static List<Handler> allConnected_hand = new ArrayList<Handler>();
 	public static void main(String[] args) throws Exception {
         //creating log file
         try {
@@ -146,7 +149,9 @@ public class Peer2 {
         //connect to peers with lower id (peers we want to connect to)
         if(peerList.size() != 0) {
             for (String[] s : peerList) {
-                new peerHandler(s[1], Integer.parseInt(s[2]), Integer.parseInt(s[0])).start();
+                peerHandler p = new peerHandler(s[1], Integer.parseInt(s[2]), Integer.parseInt(s[0]), allConnected_peer, allConnected_hand);
+                allConnected_peer.add(p);
+                p.start();
             }
         } else {
             System.out.println("I am Top");
@@ -157,8 +162,10 @@ public class Peer2 {
         ServerSocket listener = new ServerSocket(sPort);
         try {
         	while(true) {
-            	new Handler(listener.accept()).start();
-	    		System.out.println("Someone is attempting to connect!");
+            	Handler h = new Handler(listener.accept(), allConnected_peer, allConnected_hand);
+                allConnected_hand.add(h);
+                h.start();
+                System.out.println("Someone is attempting to connect!");
     		}
         } finally {
     		listener.close();
@@ -177,10 +184,15 @@ public class Peer2 {
         private String outMessage;             //messages going out     
         Socket requestSocket;                  //the socket we are requesting
 
-        public peerHandler(String peerdest, int peerPort, int peerID) {
+        List<peerHandler> allConnected_peer;
+        List<Handler> allConnected_hand;
+
+        public peerHandler(String peerdest, int peerPort, int peerID, List<peerHandler> allConnected_peer, List<Handler> allConnected_hand) {
             this.peerdest = peerdest;
             this.peerPort = peerPort;
             this.peerID = peerID;
+            this.allConnected_peer = allConnected_peer;
+            this.allConnected_hand = allConnected_hand;
         }
 
         public void run() {
@@ -381,7 +393,7 @@ public class Peer2 {
                                 bitfield = bitfield.substring(0, Integer.parseInt(index_contents)) + "1" + bitfield.substring(Integer.parseInt(index_contents) + 1);
 
                                 outMessage = "00054" + index_contents;
-                                sendMessage(outMessage);
+                                sendToAll(outMessage);
 
                                 //iterate through servers bitfield and own bitfield and get list of pieces still needed
                                 List<Integer> neededFromServer = new ArrayList<Integer>();
@@ -499,6 +511,16 @@ public class Peer2 {
                 ioException.printStackTrace();
             }
         }
+
+        public void sendToAll(String msg) throws IOException {
+            for (peerHandler p : allConnected_peer) {
+                p.sendMessage(msg);
+            }
+            for (Handler h : allConnected_hand) {
+                h.sendMessage(msg);
+            }
+            System.out.println("Done");
+        }
     }
 
     //code in Handler and peerHandler is largely the same with similar logic. difference in loop structure due to handshake
@@ -513,8 +535,13 @@ public class Peer2 {
         private ObjectOutputStream out;        //stream write to the socket
         private int peerID;                    //peer's ID
 
-        public Handler(Socket connection) {
-        	this.connection = connection;
+        List<peerHandler> allConnected_peer;
+        List<Handler> allConnected_hand;
+
+        public Handler(Socket connection, List<peerHandler> allConnected_peer, List<Handler> allConnected_hand) {
+            this.connection = connection;
+            this.allConnected_peer = allConnected_peer;
+            this.allConnected_hand = allConnected_hand;
         }
 
         public void run() {
@@ -729,7 +756,7 @@ public class Peer2 {
                                 bitfield = bitfield.substring(0, Integer.parseInt(index_contents)) + "1" + bitfield.substring(Integer.parseInt(index_contents) + 1);
 
                                 outMessage = "00054" + index_contents;
-                                sendMessage(outMessage);
+                                sendToAll(outMessage);
                             }
                             
                         } else {
@@ -788,6 +815,16 @@ public class Peer2 {
             } catch(IOException ioException) {
                 ioException.printStackTrace();
             }
+        }
+
+        public void sendToAll(String msg) throws IOException {
+            for (peerHandler p : allConnected_peer) {
+                p.sendMessage(msg);
+            }
+            for (Handler h : allConnected_hand) {
+                h.sendMessage(msg);
+            }
+            System.out.println("Done");
         }
     }
 }

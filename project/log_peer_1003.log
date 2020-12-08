@@ -1,2 +1,5 @@
-[12:40:14]: Peer [1003] makes a connection to Peer [1002]
-[12:40:14]: Peer [1003] received the ‘not interested’ message from [1002]
+[20:46:35]: Peer [1003] makes a connection to Peer [1002]
+[20:46:35]: Peer [1003] received the ‘not interested’ message from [1002]
+[20:46:45]: Peer [1003] makes a connection to Peer [1001]
+[20:46:45]: Peer [1003] received the ‘not interested’ message from [1001]
+[20:46:45]: Peer [1003] is unchoked by [1001]
