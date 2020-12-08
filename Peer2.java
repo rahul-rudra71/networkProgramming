@@ -304,9 +304,15 @@ public class Peer2 {
                             // Have --> 4
                             if(msg_type.equals("4")) {
                                 //received have message from server peer, update their bitfield value in peer_bits hashmap
-                                String temp_field = peer_bits.get(peerID);
-                                temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
-                                peer_bits.put(peerID, temp_field);
+                                if(peer_bits.containsValue(peerID)){
+                                    String temp_field = peer_bits.get(peerID);
+                                    temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
+                                    peer_bits.put(peerID, temp_field);
+                                }else{
+                                    String temp_field = bitfield.replace('1', '0');
+                                    temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
+                                    peer_bits.put(peerID, temp_field);
+                                }
 
                                 //reevaluate interest
                                 //determine if server peer has pieces that client peer does not, then send
@@ -647,9 +653,15 @@ public class Peer2 {
                             // Have --> 4
                             if(msg_type.equals("4")) {
                                 //received have message from client peer, update their bitfield value in peer_bits hashmap
-                                String temp_field = peer_bits.get(peerID);
-                                temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
-                                peer_bits.put(peerID, temp_field);
+                                if(peer_bits.containsValue(peerID)){
+                                    String temp_field = peer_bits.get(peerID);
+                                    temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
+                                    peer_bits.put(peerID, temp_field);
+                                }else{
+                                    String temp_field = bitfield.replace('1', '0');
+                                    temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
+                                    peer_bits.put(peerID, temp_field);
+                                }
 
                                 //reevaluate interest
                                 //determine if server peer has pieces that client peer does not, then send
