@@ -21,7 +21,7 @@ import java.lang.Math;
 public class Peer2 {
 
     //this is just for testing we will need to change this later to project specifications
-    private static final int myID = 1002;   //The peer will have this ID
+    private static final int myID = 1001;   //The peer will have this ID
     public static String bitfield = "";
     public static HashMap<Integer, String> peer_bits = new HashMap<Integer, String>();
     public static List<Integer> peer_interest = new ArrayList<Integer>();
