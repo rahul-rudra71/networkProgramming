@@ -29,7 +29,7 @@ import java.util.TimerTask;
 public class Peer2 {
 
     //this is just for testing we will need to change this later to project specifications
-    private static final int myID = 1003;   //The peer will have this ID
+    private static final int myID = 1002;   //The peer will have this ID
     public static String bitfield = "";
     public static HashMap<Integer, String> peer_bits = new HashMap<Integer, String>();
     public static HashMap<Integer, Integer> peer_data_rate = new HashMap<Integer, Integer>();
@@ -39,9 +39,6 @@ public class Peer2 {
     public static FileWriter logger;
     public static LocalTime timeNow;
     public static DateTimeFormatter timeFormat = DateTimeFormatter.ofPattern("HH:mm:ss");
-    public static int noPrefNeighbors = 1; // Initializing at least to 1
-    public static long unchokingInt = 5; // Initializing to at least 5 secs
-    public static long optUnchokingInt = 15; // Initializing to at least 15 secs
 
     public static List<peerHandler> allConnected_peer = new ArrayList<peerHandler>();
     public static List<Handler> allConnected_hand = new ArrayList<Handler>();
@@ -235,151 +232,124 @@ public class Peer2 {
 
     //Unchoke Timer
     public static class UnchokeTimer extends TimerTask {
-        @Override
+       // @Override
+        private String outMessage;    //messages going out 
+        private int peerID;                    //peer's ID 
+        private ObjectOutputStream out;        //stream write to the socket 
         public void run () {
-            timeNow = LocalTime.now();
-            System.out.print("Unchoke Timer: ");
-            System.out.println(timeNow.format(timeFormat));
-        }
-    }
-
-    //Optimistic Unchoke Timer
-    public static class OptUnchokeTimer extends TimerTask {
-        @Override
-        public void run () {
-            timeNow = LocalTime.now();
-            System.out.print("Opt Unchoke Timer: ");
-            System.out.println(timeNow.format(timeFormat));
-        }
-    }
-
-     private static class UnchokeTimer extends TimerTask 
-    { 
-        peerHandler p;
-        Handler h;
-        String conn = "";
-
-        public UnchokeTimer(peerHandler p, Handler h, String conn) {
-
-            this.conn = conn;
-            if(conn.equals("Peer")) 
-                this.p = p;
-            else if(conn.equals("Handler"))
-                this.h = h;
-        }
-
-        public void run() 
-        { 
-            if(peer_data_rate.size() > 0) {
-                if(conn.equals("Peer")) {
-                    List<Integer> pNbor = p.chokeUnchokeNeighbors(peer_data_rate);
-                    String outMessage = "";
+            List<Integer> pNbor = chokeUnchokeNeighbors(peer_data_rate);
                     
                     for (peerHandler p : allConnected_peer) {
                         boolean found = false;
                         for(int l : pNbor) {
                             if(p.peerID == l) {
                                 outMessage = "00011";
-
-                                if(conn.equals("Peer")) 
-                                    p.sendMessage(outMessage);
-                                else if(conn.equals("Handler"))
-                                    h.sendMessage(outMessage);
-
-                                System.out.println("AKS elapsedTimeForUnchk for loop PNbor");
+                                sendMessage(outMessage);
                                 found = true;
                             }
                         }
                         
                         if(!found) {
                             outMessage = "00010";
-                            p.sendMessage(outMessage);
-                            System.out.println("AKS Choke message");
+                            sendMessage(outMessage);
                         }
                     }
-                }
-                else {
-                    List<Integer> pNbor = h.chokeUnchokeNeighbors(peer_data_rate);
-                    String outMessage = "";
-                    
-                    for (Handler h : allConnected_hand) {
-                        boolean found = false;
-                        for(int l : pNbor) {
-                            if(h.peerID == l) {
-                                outMessage = "00011";
-
-                                h.sendMessage(outMessage);
-                                System.out.println("AKS elapsedTimeForUnchk for loop PNbor");
-                                found = true;
-                            }
-                        }
-                        
-                        if(!found) {
-                            outMessage = "00010";
-                        
-                            h.sendMessage(outMessage);
-                            System.out.println("AKS Choke message");
-                        }
-                    }
-                }
-            }
-        } 
-
-    } 
-
-    private static class OptNbrTimer extends TimerTask 
-    { 
-        peerHandler p;
-        Handler h;
-        String conn = "";
-
-        public OptNbrTimer(peerHandler p, Handler h, String conn) {
-            this.conn = conn;
-            if(conn.equals("Peer")) 
-                this.p = p;
-            else if(conn.equals("Handler"))
-                this.h = h;
-    
+           
+            timeNow = LocalTime.now();
+            System.out.print("Unchoke Timer: ");
+            System.out.println(timeNow.format(timeFormat));
         }
 
-        public void run() 
-        { 
-            int result = 0;
-            String outMessage = "";
-            int randPeer = 0;
+     //method to send message to peer
+     public void sendMessage(String msg) {
+        try {
+            out.writeObject(msg);
+            out.flush();
+            System.out.println("Send message: " + msg + " to Peer " + Integer.toString(peerID));
+        } catch(IOException ioException) {
+            ioException.printStackTrace();
+        }
+    }
 
+    public List<Integer> chokeUnchokeNeighbors(HashMap<Integer, Integer> pDataRate) {
+        Map<Integer, Integer> hm1 = sortByValue(pDataRate); 
+
+        List<Integer> topNeighbors = new ArrayList<Integer>();
+        int count = 0;
+
+        for (Map.Entry<Integer, Integer> en : hm1.entrySet()) { 
+            if(count > noPrefNeighbors) 
+                break;
+            else 
+            topNeighbors.add(en.getKey());
+            System.out.println("AKS engetkey" + en.getKey());
+
+        }
+        return topNeighbors;
+    }
+
+      // function to sort hashmap by values 
+    
+      public static HashMap<Integer, Integer> sortByValue(HashMap<Integer, Integer> hm) 
+    { 
+        // Create a list from elements of HashMap 
+        LinkedHashMap<Integer, Integer> reverseSortedMap = new LinkedHashMap<>(); 
+
+        hm.entrySet()
+        .stream()
+        .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder())) 
+        .forEachOrdered(x -> reverseSortedMap.put(x.getKey(), x.getValue()));         
+        
+        return reverseSortedMap; 
+    }
+
+    }
+
+    //Optimistic Unchoke Timer
+    public static class OptUnchokeTimer extends TimerTask {
+      //  @Override
+        private String outMessage;    //messages going out 
+        private int peerID;                    //peer's ID 
+        private ObjectOutputStream out;        //stream write to the socket 
+        public void run () {
+            int result = 0;
             if(peer_interest.size() > 1) {
                 Random r = new Random();
                 int low = 0;
                 int high = peer_interest.size();
                 result = r.nextInt(high-low) + low;     
-                randPeer = peer_interest.get(result);
             }
             
-            if(conn.equals("Peer")) {
-                for (peerHandler p : allConnected_peer) {
-                    if(p.peerID == randPeer) {
-                        outMessage = "00011";
-                        p.sendMessage(outMessage);
-                        System.out.println("AKS Handlr rand peer");
-                        break;
-                    }
+            int randPeer = peer_interest.get(result);
+
+            for (Handler p : allConnected_hand) {
+                if(p.peerID == randPeer) {
+                    outMessage = "00011";
+                    sendMessage(outMessage);
+                    System.out.println("AKS Handlr rand peer");
+                    break;
                 }
             }
-            else {
-                for (Handler p : allConnected_hand) {
-                    if(p.peerID == randPeer) {
-                        outMessage = "00011";
-                        p.sendMessage(outMessage);
-                        System.out.println("AKS Handlr rand peer");
-                        break;
-                    }
-                }
+            timeNow = LocalTime.now();
+            System.out.print("Opt Unchoke Timer: ");
+            System.out.println(timeNow.format(timeFormat));
+        }
 
+        //method to send message to peer
+        public void sendMessage(String msg) {
+            try {
+                out.writeObject(msg);
+                out.flush();
+                System.out.println("Send message: " + msg + " to Peer " + Integer.toString(peerID));
+            } catch(IOException ioException) {
+                ioException.printStackTrace();
             }
-        } 
+        }
 
-    } 
+
+    }
+
+ 
 
     /* A peerhandler thread class. peerhandlers are spawned everytime you want to connect to a peer lower than yourself
     This is the client perspective of the project*/
@@ -407,77 +377,9 @@ public class Peer2 {
         }
 
         public void run() {
-                long elapsedTimeForUnChk = 0;
-                            long elapsedTimeForOptNbor = 0;
-                            boolean shake = false;
 
-                /***********************************************************************
-                            Timer timer1 = new Timer(); 
-                            TimerTask task1 = new UnchokeTimer(this, null, "Peer");
-                            timer1.schedule(task1, unchokingInt, unchokingInt);
-
-                            Timer timer2 = new Timer(); 
-                            TimerTask task2 = new OptNbrTimer(this, null,  "Peer");
-                            timer2.schedule(task2, optUnchokingInt, optUnchokingInt);
-                ******************************************************************************/
 
             while(true) {
-          
-            /**************************************************************************************/
-                Duration duration = Duration.between(prevUnChkTime, LocalTime.now());
-                System.out.println("Duration: " + duration.getSeconds());
-
-                elapsedTimeForUnChk = Duration.between(prevUnChkTime, LocalTime.now()).toSeconds();
-                elapsedTimeForOptNbor = Duration.between(prevOptNborTime, LocalTime.now()).toSeconds();
-                 System.out.println("AKS** elapsedTimeForUnChk: " + elapsedTimeForUnChk);
-                 System.out.println("AKS** elapsedTimeForUnChk: " + elapsedTimeForOptNbor);
-
-
-                if(elapsedTimeForUnChk >= unchokingInt && shake && allConnected_peer.size() >= noPrefNeighbors) {
-                    List<Integer> pNbor = chokeUnchokeNeighbors(peer_data_rate);
-                    
-                    for (peerHandler p : allConnected_peer) {
-                        boolean found = false;
-                        for(int l : pNbor) {
-                            if(p.peerID == l) {
-                                outMessage = "00011";
-                                sendMessage(outMessage);
-                                System.out.println("AKS elapsedTimeForUnchk for loop PNbor");
-                                found = true;
-                            }
-                        }
-                        
-                        if(!found) {
-                            outMessage = "00010";
-                            sendMessage(outMessage);
-                            System.out.println("AKS Choke message");
-                        }
-                    }
-                    prevUnChkTime = LocalTime.now();
-                }
-
-                if(elapsedTimeForOptNbor >= optUnchokingInt && shake) {
-                    int result = 0;
-                    if(peer_interest.size() > 1) {
-                        Random r = new Random();
-                        int low = 0;
-                        int high = peer_interest.size();
-                        result = r.nextInt(high-low) + low;     
-                    }
-                    
-                    int randPeer = peer_interest.get(result);
-
-                    for (Handler p : allConnected_hand) {
-                        if(p.peerID == randPeer) {
-                            outMessage = "00011";
-                            sendMessage(outMessage);
-                            System.out.println("AKS Handlr rand peer");
-                            break;
-                        }
-                    }
-                    prevOptNborTime = LocalTime.now();
-                }
-            /**************************************************************************************/
 
                 try {
                     //create a socket to connect to the server
@@ -857,7 +759,7 @@ public class Peer2 {
             System.out.println("Done");
         }
 
-            public List<Integer> chokeUnchokeNeighbors(HashMap<Integer, Integer> pDataRate) {
+      /*     public List<Integer> chokeUnchokeNeighbors(HashMap<Integer, Integer> pDataRate) {
             Map<Integer, Integer> hm1 = sortByValue(pDataRate); 
 
             List<Integer> topNeighbors = new ArrayList<Integer>();
@@ -886,8 +788,8 @@ public class Peer2 {
             .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder())) 
             .forEachOrdered(x -> reverseSortedMap.put(x.getKey(), x.getValue()));         
             
-            return reverseSortedMap; 
-        }    
+            return reverseSortedMap;  
+        }   */ 
     }
 
     //code in Handler and peerHandler is largely the same with similar logic. difference in loop structure due to handshake
@@ -929,75 +831,10 @@ public class Peer2 {
                 int length_bytes = 0;
                 boolean sentInterest = false;
                 long elapsedTimeForUnChk = 0;
-                long elapsedTimeForOptNbor = 0;
-
-            /*************************************************************                
-                Timer timer1 = new Timer(); 
-                TimerTask task1 = new UnchokeTimer(null, this, "Handler");
-                timer1.schedule(task1, unchokingInt, unchokingInt);
-    
-                Timer timer2 = new Timer(); 
-                TimerTask task2 = new OptNbrTimer(null, this, "Handler");
-                timer2.schedule(task2, optUnchokingInt, optUnchokingInt);
-    
-            **************************************************************************/   
+                long elapsedTimeForOptNbor = 0;  
 
                 try{
                     while(true) {
-
-                    /*************************************************************************************************  */                      
-                        Duration duration = Duration.between(prevUnChkTime, LocalTime.now());
-                        System.out.println("Handler Duration: " + duration.getNano());
-                        elapsedTimeForUnChk = Duration.between(prevUnChkTime, LocalTime.now()).toSeconds();
-                        elapsedTimeForOptNbor = Duration.between(prevOptNborTime, LocalTime.now()).toSeconds();
-                                
-                        System.out.println("elapsedTimeForUnChk: **" + elapsedTimeForUnChk);
-                        System.out.println("elapsedTimeForOptNbor: **" + elapsedTimeForOptNbor);
-
-                        if(elapsedTimeForUnChk >= unchokingInt && shake && allConnected_peer.size() >= noPrefNeighbors) {
-                            List<Integer> pNbor = chokeUnchokeNeighbors(peer_data_rate);
-                            
-                            for (Handler p : allConnected_hand) {
-                                boolean found = false;
-                                for(int l : pNbor) {
-                                    if(p.peerID == l) {
-                                        outMessage = "00011";
-                                        sendMessage(outMessage);
-                                        System.out.println("AKS Handler loop");
-                                        found = true;
-                                    }
-                                }
-                                
-                                if(!found) {
-                                    outMessage = "00010";
-                                    sendMessage(outMessage);
-                                }
-                            }
-                            prevUnChkTime = LocalTime.now();
-                        }
-
-                        if(elapsedTimeForOptNbor >= optUnchokingInt && shake) {
-                            int result = 0;
-                            if(peer_interest.size() > 1) {
-                                Random r = new Random();
-                                int low = 0;
-                                int high = peer_interest.size();
-                                result = r.nextInt(high-low) + low;     
-                            }
-                            
-                            int randPeer = peer_interest.get(result);
-
-                            for (Handler p : allConnected_hand) {
-                                if(p.peerID == randPeer) {
-                                    outMessage = "00011";
-                                    sendMessage(outMessage);
-                                    System.out.println("AKS Handlr rand peer");
-                                    break;
-                                }
-                            }
-                            prevOptNborTime = LocalTime.now();
-                        }
-                    /************************************************************************************************/
                         //receive the message sent from the client
                         inMessage = (String)in.readObject();
 
@@ -1342,7 +1179,7 @@ public class Peer2 {
             System.out.println("Done");
         }
 
-            public List<Integer> chokeUnchokeNeighbors(HashMap<Integer, Integer> pDataRate) {
+         /*   public List<Integer> chokeUnchokeNeighbors(HashMap<Integer, Integer> pDataRate) {
             Map<Integer, Integer> hm1 = sortByValue(pDataRate); 
 
             List<Integer> topNeighbors = new ArrayList<Integer>();
@@ -1373,7 +1210,7 @@ public class Peer2 {
                 { 
                     return (o1.getValue()).compareTo(o2.getValue()); 
                 } 
-            });*/
+            });*/ /*
             hm.entrySet()
             .stream()
             .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder())) 
@@ -1384,7 +1221,8 @@ public class Peer2 {
             for (Map.Entry<Integer, Integer> aa : list) { 
                 temp.put(aa.getKey(), aa.getValue()); 
             } */
-            return reverseSortedMap; 
-        }  
-    }
+            //return reverseSortedMap; 
+      //  }   
+     }
 }
+
