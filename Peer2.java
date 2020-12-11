@@ -23,7 +23,7 @@ import java.lang.Math;
 public class Peer2 {
 
     //this is just for testing we will need to change this later to project specifications
-    private static final int myID = 1003;   //The peer will have this ID
+    private static final int myID = 1004;   //The peer will have this ID
     public static String bitfield = "";
     public static HashMap<Integer, String> peer_bits = new HashMap<Integer, String>();
     public static List<Integer> peer_interest = new ArrayList<Integer>();
@@ -36,10 +36,11 @@ public class Peer2 {
     public static List<peerHandler> allConnected_peer = new ArrayList<peerHandler>();
     public static List<Handler> allConnected_hand = new ArrayList<Handler>();
 
-    public static int noPrefNeighbors = 1; // Initializing at least to 1
+    public static int noPrefNeighbors; 
     public static HashMap<Integer, Integer> prefNeighbor = new HashMap<Integer, Integer>();
-    public static long optUnchokingInt = 15; // Initializing to at least 15 secs
-    public static long unchokingInt = 5; // Initializing to at least 5 secs
+    public static long optUnchokingInt; 
+    public static long unchokingInt; 
+    public static int theChosen;
 	public static void main(String[] args) throws Exception {
         //creating log file
         try {
@@ -230,9 +231,44 @@ public class Peer2 {
     public static class OptUnchokeTimer extends TimerTask {
         @Override
         public void run () {
-            timeNow = LocalTime.now();
             System.out.print("Opt Unchoke Timer: ");
-            System.out.println(timeNow.format(timeFormat));
+            List<Integer> temp = new ArrayList<Integer>();
+            for(int i : peer_interest) {
+                if(!prefNeighbor.containsKey(i)) {
+                    temp.add(i);
+                }
+            }
+
+            if(temp.size() != 0) {
+                int release = temp.get((int) (Math.random() * (temp.size() - 1)));
+                if(theChosen == release) {
+                    System.out.println("The choosen one strikes again");                 
+                } else {
+                    for (peerHandler p : allConnected_peer) {
+                        if(theChosen == p.myPartner()) {
+                            System.out.print("choke peer: " + Integer.toString(theChosen));
+                            p.sendMessage("00010");
+                        }
+                        if(release == p.myPartner()) {
+                            System.out.println("unchoke peer: " + Integer.toString(release));
+                            p.sendMessage("00011");
+                        }
+                    }
+                    for (Handler h : allConnected_hand) {
+                        if(theChosen == h.myPartner()) {
+                            System.out.print("choke peer: " + Integer.toString(theChosen));
+                            h.sendMessage("00010");
+                        }
+                        if(release == h.myPartner()) {
+                            System.out.println("unchoke peer: " + Integer.toString(release));
+                            h.sendMessage("00011");
+                        }
+                    }
+                    theChosen = release;
+                }
+            } else {
+                System.out.println("no change");
+            }
         }
     }
 
@@ -358,9 +394,9 @@ public class Peer2 {
                                     sendMessage(outMessage);
 
                                     prefNeighbor.put(peerID, 0);
-                                    //System.out.println("check");
-                                    //System.out.println(noPrefNeighbors);
-                                    System.out.println(prefNeighbor);
+                                    System.out.println("check");
+                                    System.out.println(noPrefNeighbors);
+                                    System.out.println(prefNeighbor.size());
                                 } else {
                                     System.out.println("no room");
                                 }
@@ -625,6 +661,10 @@ public class Peer2 {
             }
             System.out.println("Done");
         }
+
+        public int myPartner() {
+            return peerID;
+        }
     }
 
     //code in Handler and peerHandler is largely the same with similar logic. difference in loop structure due to handshake
@@ -786,7 +826,6 @@ public class Peer2 {
                                 if(peer_interest.contains(peerID)){
                                     if(peer_bits.get(peerID).equals(bitfield)){
                                         //bifields are equivalent, not interested
-
                                         peer_interest.remove(peer_interest.indexOf(peerID));
                                         choked = true;
                                     }else {
@@ -995,6 +1034,10 @@ public class Peer2 {
                 h.sendMessage(msg);
             }
             System.out.println("Done");
+        }
+
+        public int myPartner() {
+            return peerID;
         }
     }
 }
