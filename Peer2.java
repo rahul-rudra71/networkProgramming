@@ -21,7 +21,7 @@ import java.lang.Math;
 public class Peer2 {
 
     //this is just for testing we will need to change this later to project specifications
-    private static final int myID = 1001;   //The peer will have this ID
+    private static final int myID = 1003;   //The peer will have this ID
     public static String bitfield = "";
     public static HashMap<Integer, String> peer_bits = new HashMap<Integer, String>();
     public static List<Integer> peer_interest = new ArrayList<Integer>();
@@ -33,6 +33,9 @@ public class Peer2 {
 
     public static List<peerHandler> allConnected_peer = new ArrayList<peerHandler>();
     public static List<Handler> allConnected_hand = new ArrayList<Handler>();
+
+    public static int noPrefNeighbors = 1; // Initializing at least to 1
+    public static HashMap<Integer, Integer> prefNeighbor = new HashMap<Integer, Integer>();
 	public static void main(String[] args) throws Exception {
         //creating log file
         try {
@@ -87,6 +90,10 @@ public class Peer2 {
             while(myReader.hasNextLine()) {
                 String[] fileData = (myReader.nextLine()).split(" ");
                 metadata.put(fileData[0], fileData[1]);
+                
+                if(fileData[0].equals("NumberOfPreferredNeighbors")) {
+                    noPrefNeighbors = Integer.parseInt(fileData[1]);
+                }
             }
             myReader.close();
         } catch (FileNotFoundException e) {
@@ -301,6 +308,9 @@ public class Peer2 {
                             if(msg_type.equals("2")) {
                                 //add peerID --> interest pair to map
                                 peer_interest.add(peerID);
+
+                                outMessage = "00011";
+                                sendMessage(outMessage);
 
                                 //write to log file
                                 timeNow = LocalTime.now();
@@ -668,6 +678,7 @@ public class Peer2 {
                             if(msg_type.equals("2")) {
                                 //add peerID --> interest pair to map
                                 peer_interest.add(peerID);
+
                                 outMessage = "00011";
                                 sendMessage(outMessage);
 
@@ -822,6 +833,36 @@ public class Peer2 {
                                 }
                                 if(terminado) {
                                     System.out.println("Terminado");
+                                }
+
+                                //iterate through servers bitfield and own bitfield and get list of pieces still needed
+                                List<Integer> neededFromServer = new ArrayList<Integer>();
+                                for(int i = 0; i < bitfield.length(); i++){
+                                    if(Integer.parseInt(bitfield.substring(i, i+1)) < Integer.parseInt(peer_bits.get(peerID).substring(i, i+1))){
+                                        neededFromServer.add(i);
+                                    }
+                                }
+
+                                //request new piece if there are more that can be transferred
+                                if((neededFromServer.size() != 0) && (choked == false)){
+                                    int requested = (int) (Math.random() * neededFromServer.size());
+                                    zero_pad = Integer.toString(neededFromServer.get(requested));
+
+                                    //zero pad index field if needed
+                                    if(zero_pad.length() < 4){
+                                        length_bytes = zero_pad.length();
+                                        for(int i = 0; i < (4 - length_bytes); i++){
+                                            zero_pad = "0" + zero_pad;
+                                        }
+                                    }
+
+                                    //construct message, length will always be 5 for type + index
+                                    outMessage = "00056" + zero_pad;
+                                    sendMessage(outMessage);
+                                    
+                                    zero_pad = "";
+                                }else{
+                                    //end requesting loop, no more pieces needed from this server
                                 }
                             }
                             

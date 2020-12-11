@@ -1,8 +1,0 @@
-[09:39:46]: Peer [1002] is connected from Peer [1003]
-[09:39:46]: Peer [1002] received the ‘not interested’ message from [1003]
-[09:39:56]: Peer [1002] received the ‘have’ message from [1003] for the piece [piece index]
-[09:39:56]: Peer [1002] received the ‘have’ message from [1003] for the piece [piece index]
-[09:39:56]: Peer [1002] received the ‘have’ message from [1003] for the piece [piece index]
-[09:39:56]: Peer [1002] makes a connection to Peer [1001]
-[09:39:56]: Peer [1002] received the ‘not interested’ message from [1001]
-[09:39:56]: Peer [1002] is unchoked by [1001]
