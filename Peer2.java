@@ -13,6 +13,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.Map;
@@ -27,8 +29,7 @@ import java.util.TimerTask;
 public class Peer2 {
 
     //this is just for testing we will need to change this later to project specifications
-    //private static final int myID = 1001;   //The peer will have this ID
-    private static int myID = 1002;   //The peer will have this ID
+    private static final int myID = 1003;   //The peer will have this ID
     public static String bitfield = "";
     public static HashMap<Integer, String> peer_bits = new HashMap<Integer, String>();
     public static HashMap<Integer, Integer> peer_data_rate = new HashMap<Integer, Integer>();
@@ -44,9 +45,14 @@ public class Peer2 {
 
     public static List<peerHandler> allConnected_peer = new ArrayList<peerHandler>();
     public static List<Handler> allConnected_hand = new ArrayList<Handler>();
+
+    public static int noPrefNeighbors = 1; // Initializing at least to 1
+    public static HashMap<Integer, Integer> prefNeighbor = new HashMap<Integer, Integer>();
+    public static long optUnchokingInt = 15; // Initializing to at least 15 secs
+    public static long unchokingInt = 5; // Initializing to at least 5 secs
 	public static void main(String[] args) throws Exception {
         //creating log file
-        try{ 
+        try {
             String logger_path = "project/log_peer_"+ Integer.toString(myID) +".log";
             File myObj1 = new File(logger_path);
             myObj1.getParentFile().mkdirs(); 
@@ -60,10 +66,6 @@ public class Peer2 {
         //This block of code reads in the peer info file, splits each line into a list of string arrays, determines peers with lower ids
         int sPort = 0;
         int hasFile = 0;
- /*       if(args[0] != null)
-            myID = Integer.parseInt(args[0]); */
-
-        System.out.println("myID: " + myID);
         List<String[]> peerList = new ArrayList<String[]>();
         try {
             File myObj = new File("PeerInfo.cfg");
@@ -78,6 +80,8 @@ public class Peer2 {
                     sPort = Integer.parseInt(peerData[2]);
                     if(Integer.parseInt(peerData[3]) == 1)
                         hasFile = 1;
+                } else {
+                    peer_bits.put(peerID, peerData[3]);
                 }
                 //if peer id is lower than ours add it to arraylist
                 //each line is put into array split by spaces
@@ -100,6 +104,16 @@ public class Peer2 {
             while(myReader.hasNextLine()) {
                 String[] fileData = (myReader.nextLine()).split(" ");
                 metadata.put(fileData[0], fileData[1]);
+                
+                if(fileData[0].equals("NumberOfPreferredNeighbors")) {
+                    noPrefNeighbors = Integer.parseInt(fileData[1]);
+                }
+                if(fileData[0].equals("UnchokingInterval")) {
+                    unchokingInt = Integer.parseInt(fileData[1]);
+                }
+                if(fileData[0].equals("OptimisticUnchokingInterval")) {
+                    optUnchokingInt = Integer.parseInt(fileData[1]);
+                }
             }
             myReader.close();
         } catch (FileNotFoundException e) {
@@ -107,6 +121,7 @@ public class Peer2 {
             e.printStackTrace();
         }
         String fileData = "";
+
         //This block reads in the current piece contents of the file meant to be transferred by the protocol
         try {
             File myObj = new File(metadata.get("FileName"));
@@ -129,7 +144,6 @@ public class Peer2 {
         noPrefNeighbors = Integer.parseInt(metadata.get("NumberOfPreferredNeighbors"));
         unchokingInt = Integer.parseInt(metadata.get("UnchokingInterval"));
         optUnchokingInt = Integer.parseInt(metadata.get("OptimisticUnchokingInterval"));
-    
 
         if(hasFile == 1) {
             for(int i = 0; i < Math.ceil(Double.valueOf(fileSize) / Double.valueOf(pieceSize)); i++) {
@@ -161,6 +175,20 @@ public class Peer2 {
             }
         }
 
+        //creating everyone's bitfields
+        for(HashMap.Entry<Integer, String> poop : peer_bits.entrySet()) {
+            if( (poop.getValue()).equals("0") ) {
+                for(int i = 0; i < bitfield.length() -1; i++) {
+                    peer_bits.put(poop.getKey(), poop.getValue() + "0");
+                }
+            } else {
+                for(int i = 0; i < bitfield.length() -1; i++) {
+                    peer_bits.put(poop.getKey(), poop.getValue() + "1");
+                }
+            }
+            System.out.println(poop.getKey() + " = " + poop.getValue());
+        }
+
         //for visual confirmation
         System.out.print("pieces: ");
         System.out.println(pieces);
@@ -168,6 +196,16 @@ public class Peer2 {
         System.out.println("noPrefNeighbors: " + noPrefNeighbors);
         System.out.println("unchokingInt: " + unchokingInt);
         System.out.println("optUnchokingInt: " + optUnchokingInt);
+
+        //Start Unchoke Timer
+        Timer timer = new Timer();
+        TimerTask task = new UnchokeTimer();
+        timer.schedule(task, 0, unchokingInt * 1000);
+
+        //Start Optimistically Unchoke Timer
+        Timer timer1 = new Timer();
+        TimerTask task1 = new OptUnchokeTimer();
+        timer1.schedule(task1, 0, optUnchokingInt * 1000);
 
         //connect to peers with lower id (peers we want to connect to)
         if(peerList.size() != 0) {
@@ -195,7 +233,27 @@ public class Peer2 {
     	} 
     }
 
-    private static class UnchokeTimer extends TimerTask 
+    //Unchoke Timer
+    public static class UnchokeTimer extends TimerTask {
+        @Override
+        public void run () {
+            timeNow = LocalTime.now();
+            System.out.print("Unchoke Timer: ");
+            System.out.println(timeNow.format(timeFormat));
+        }
+    }
+
+    //Optimistic Unchoke Timer
+    public static class OptUnchokeTimer extends TimerTask {
+        @Override
+        public void run () {
+            timeNow = LocalTime.now();
+            System.out.print("Opt Unchoke Timer: ");
+            System.out.println(timeNow.format(timeFormat));
+        }
+    }
+
+     private static class UnchokeTimer extends TimerTask 
     { 
         peerHandler p;
         Handler h;
@@ -349,24 +407,23 @@ public class Peer2 {
         }
 
         public void run() {
+                long elapsedTimeForUnChk = 0;
+                            long elapsedTimeForOptNbor = 0;
+                            boolean shake = false;
 
-            long elapsedTimeForUnChk = 0;
-            long elapsedTimeForOptNbor = 0;
-            boolean shake = false;
+                /***********************************************************************
+                            Timer timer1 = new Timer(); 
+                            TimerTask task1 = new UnchokeTimer(this, null, "Peer");
+                            timer1.schedule(task1, unchokingInt, unchokingInt);
 
-/***********************************************************************
-            Timer timer1 = new Timer(); 
-            TimerTask task1 = new UnchokeTimer(this, null, "Peer");
-            timer1.schedule(task1, unchokingInt, unchokingInt);
-
-            Timer timer2 = new Timer(); 
-            TimerTask task2 = new OptNbrTimer(this, null,  "Peer");
-            timer2.schedule(task2, optUnchokingInt, optUnchokingInt);
-******************************************************************************/
+                            Timer timer2 = new Timer(); 
+                            TimerTask task2 = new OptNbrTimer(this, null,  "Peer");
+                            timer2.schedule(task2, optUnchokingInt, optUnchokingInt);
+                ******************************************************************************/
 
             while(true) {
-
-/**************************************************************************************/
+          
+            /**************************************************************************************/
                 Duration duration = Duration.between(prevUnChkTime, LocalTime.now());
                 System.out.println("Duration: " + duration.getSeconds());
 
@@ -420,7 +477,8 @@ public class Peer2 {
                     }
                     prevOptNborTime = LocalTime.now();
                 }
-/**************************************************************************************/
+            /**************************************************************************************/
+
                 try {
                     //create a socket to connect to the server
                     requestSocket = new Socket(peerdest, peerPort);
@@ -430,7 +488,9 @@ public class Peer2 {
                     out = new ObjectOutputStream(requestSocket.getOutputStream());
                     out.flush();
                     in = new ObjectInputStream(requestSocket.getInputStream());
+                    boolean shake = false;
                     boolean choked = true;
+                    boolean terminado = false;
                     int length = 0;
                     String msg_type = "";
                     String contents = "";
@@ -472,6 +532,9 @@ public class Peer2 {
 
                                 //set choke status
                                 choked = false;
+
+                                prefNeighbor.put(peerID, 0);
+                                System.out.println(prefNeighbor);
                                 
                                 //iterate through servers bitfield and own bitfield and get list of pieces needed
                                 List<Integer> neededFromServer = new ArrayList<Integer>();
@@ -508,6 +571,18 @@ public class Peer2 {
                                 //add peerID --> interest pair to map
                                 peer_interest.add(peerID);
 
+                                if(prefNeighbor.size() < noPrefNeighbors) {
+                                    outMessage = "00011";
+                                    sendMessage(outMessage);
+
+                                    prefNeighbor.put(peerID, 0);
+                                    //System.out.println("check");
+                                    //System.out.println(noPrefNeighbors);
+                                    System.out.println(prefNeighbor);
+                                } else {
+                                    System.out.println("no room");
+                                }
+
                                 //write to log file
                                 timeNow = LocalTime.now();
                                 logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] received the ‘interested’ message from ["+ Integer.toString(peerID) +"]\n");
@@ -530,6 +605,19 @@ public class Peer2 {
                                 String temp_field = peer_bits.get(peerID);
                                 temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
                                 peer_bits.put(peerID, temp_field);
+
+                                //determine whether it is time to terminate
+                                System.out.println(peer_bits);
+                                for(HashMap.Entry<Integer, String> poop : peer_bits.entrySet()) {
+                                    if( (poop.getValue()).contains("0") || bitfield.contains("0")) {
+                                        terminado = false;
+                                        break;
+                                    } 
+                                    terminado = true;
+                                }
+                                if(terminado) {
+                                    System.out.println("Terminado");
+                                }
 
                                 //reevaluate interest
                                 //determine if server peer has pieces that client peer does not, then send
@@ -612,8 +700,8 @@ public class Peer2 {
                                 pieces.set(Integer.parseInt(index_contents), piece_contents);
                                 System.out.println("Piece obtained: " + piece_contents);
 
-                                //Akshita
-                                int countOfPieces = 0;
+                                //creates duplicate hashmap storing peer IDs and countofPieces
+                                 int countOfPieces = 0;
                                 if(peer_data_rate.get(peerID) == null) {
                                     countOfPieces = 0;
                                 }
@@ -630,6 +718,17 @@ public class Peer2 {
 
                                 outMessage = "00054" + index_contents;
                                 sendToAll(outMessage);
+ 
+                                for(HashMap.Entry<Integer, String> poop : peer_bits.entrySet()) {
+                                    if( (poop.getValue()).contains("0") || bitfield.contains("0")) {
+                                        terminado = false;
+                                        break;
+                                    } 
+                                    terminado = true;
+                                }
+                                if(terminado) {
+                                    System.out.println("Terminado");
+                                }
 
                                 //iterate through servers bitfield and own bitfield and get list of pieces still needed
                                 List<Integer> neededFromServer = new ArrayList<Integer>();
@@ -758,7 +857,7 @@ public class Peer2 {
             System.out.println("Done");
         }
 
-        public List<Integer> chokeUnchokeNeighbors(HashMap<Integer, Integer> pDataRate) {
+            public List<Integer> chokeUnchokeNeighbors(HashMap<Integer, Integer> pDataRate) {
             Map<Integer, Integer> hm1 = sortByValue(pDataRate); 
 
             List<Integer> topNeighbors = new ArrayList<Integer>();
@@ -788,9 +887,7 @@ public class Peer2 {
             .forEachOrdered(x -> reverseSortedMap.put(x.getKey(), x.getValue()));         
             
             return reverseSortedMap; 
-        }         
-
-
+        }    
     }
 
     //code in Handler and peerHandler is largely the same with similar logic. difference in loop structure due to handshake
@@ -824,6 +921,7 @@ public class Peer2 {
                 in = new ObjectInputStream(connection.getInputStream());
                 boolean shake = false;
                 boolean choked = true;
+                boolean terminado = false;
                 String msg_type = "";
                 int length = 0;
                 String contents = "";
@@ -833,7 +931,7 @@ public class Peer2 {
                 long elapsedTimeForUnChk = 0;
                 long elapsedTimeForOptNbor = 0;
 
-/*************************************************************                
+            /*************************************************************                
                 Timer timer1 = new Timer(); 
                 TimerTask task1 = new UnchokeTimer(null, this, "Handler");
                 timer1.schedule(task1, unchokingInt, unchokingInt);
@@ -842,11 +940,12 @@ public class Peer2 {
                 TimerTask task2 = new OptNbrTimer(null, this, "Handler");
                 timer2.schedule(task2, optUnchokingInt, optUnchokingInt);
     
-**************************************************************************/       
+            **************************************************************************/   
+
                 try{
                     while(true) {
 
-/*************************************************************************************************  */                      
+                    /*************************************************************************************************  */                      
                         Duration duration = Duration.between(prevUnChkTime, LocalTime.now());
                         System.out.println("Handler Duration: " + duration.getNano());
                         elapsedTimeForUnChk = Duration.between(prevUnChkTime, LocalTime.now()).toSeconds();
@@ -898,7 +997,7 @@ public class Peer2 {
                             }
                             prevOptNborTime = LocalTime.now();
                         }
-/************************************************************************************************/
+                    /************************************************************************************************/
                         //receive the message sent from the client
                         inMessage = (String)in.readObject();
 
@@ -929,6 +1028,9 @@ public class Peer2 {
                                 //client peer has unchoked this server peer because it has previously sent an interest
                                 //message to the client peer, begin sending requests to client
                                 choked = false;
+
+                                prefNeighbor.put(peerID, 0);
+                                System.out.println(prefNeighbor);
                                 
                                 //iterate through servers bitfield and own bitfield and get list of pieces needed
                                 List<Integer> neededFromClient = new ArrayList<Integer>();
@@ -964,8 +1066,16 @@ public class Peer2 {
                             if(msg_type.equals("2")) {
                                 //add peerID --> interest pair to map
                                 peer_interest.add(peerID);
-                                outMessage = "00011";
-                                sendMessage(outMessage);
+                                
+                                if(prefNeighbor.size() < noPrefNeighbors) {
+                                    outMessage = "00011";
+                                    sendMessage(outMessage);
+
+                                    prefNeighbor.put(peerID, 0);
+                                    System.out.println(prefNeighbor);
+                                } else {
+                                    System.out.println("no room");
+                                }
 
                                 //write to log file
                                 timeNow = LocalTime.now();
@@ -988,6 +1098,19 @@ public class Peer2 {
                                 String temp_field = peer_bits.get(peerID);
                                 temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
                                 peer_bits.put(peerID, temp_field);
+
+                                //determine whether it is time to terminate
+                                System.out.println(peer_bits);
+                                for(HashMap.Entry<Integer, String> poop : peer_bits.entrySet()) {
+                                    if( (poop.getValue()).contains("0") || bitfield.contains("0")) {
+                                        terminado = false;
+                                        break;
+                                    } 
+                                    terminado = true;
+                                }
+                                if(terminado) {
+                                    System.out.println("Terminado!");
+                                }
 
                                 //reevaluate interest
                                 //determine if server peer has pieces that client peer does not, then send
@@ -1089,7 +1212,8 @@ public class Peer2 {
                                 String index_contents = contents.substring(0,4);
                                 String piece_contents = contents.substring(4, contents.length());
                                 pieces.set(Integer.parseInt(index_contents), piece_contents);
-                                
+
+                                //duplicate hashmap with Peer IDs and countOfPieces
                                 int countOfPieces = 0;
                                 if(peer_data_rate.get(peerID) == null) {
                                     countOfPieces = 0;
@@ -1107,6 +1231,47 @@ public class Peer2 {
 
                                 outMessage = "00054" + index_contents;
                                 sendToAll(outMessage);
+
+                                for(HashMap.Entry<Integer, String> poop : peer_bits.entrySet()) {
+                                    if( (poop.getValue()).contains("0") || bitfield.contains("0")) {
+                                        terminado = false;
+                                        break;
+                                    } 
+                                    terminado = true;
+                                }
+                                if(terminado) {
+                                    System.out.println("Terminado");
+                                }
+
+                                //iterate through servers bitfield and own bitfield and get list of pieces still needed
+                                List<Integer> neededFromServer = new ArrayList<Integer>();
+                                for(int i = 0; i < bitfield.length(); i++){
+                                    if(Integer.parseInt(bitfield.substring(i, i+1)) < Integer.parseInt(peer_bits.get(peerID).substring(i, i+1))){
+                                        neededFromServer.add(i);
+                                    }
+                                }
+
+                                //request new piece if there are more that can be transferred
+                                if((neededFromServer.size() != 0) && (choked == false)){
+                                    int requested = (int) (Math.random() * neededFromServer.size());
+                                    zero_pad = Integer.toString(neededFromServer.get(requested));
+
+                                    //zero pad index field if needed
+                                    if(zero_pad.length() < 4){
+                                        length_bytes = zero_pad.length();
+                                        for(int i = 0; i < (4 - length_bytes); i++){
+                                            zero_pad = "0" + zero_pad;
+                                        }
+                                    }
+
+                                    //construct message, length will always be 5 for type + index
+                                    outMessage = "00056" + zero_pad;
+                                    sendMessage(outMessage);
+                                    
+                                    zero_pad = "";
+                                }else{
+                                    //end requesting loop, no more pieces needed from this server
+                                }
                             }
                             
                         } else {
@@ -1177,7 +1342,7 @@ public class Peer2 {
             System.out.println("Done");
         }
 
-        public List<Integer> chokeUnchokeNeighbors(HashMap<Integer, Integer> pDataRate) {
+            public List<Integer> chokeUnchokeNeighbors(HashMap<Integer, Integer> pDataRate) {
             Map<Integer, Integer> hm1 = sortByValue(pDataRate); 
 
             List<Integer> topNeighbors = new ArrayList<Integer>();
@@ -1194,33 +1359,32 @@ public class Peer2 {
             return topNeighbors;
         }
 
-  // function to sort hashmap by values 
-    public static HashMap<Integer, Integer> sortByValue(HashMap<Integer, Integer> hm) 
-    { 
-        // Create a list from elements of HashMap 
-        LinkedHashMap<Integer, Integer> reverseSortedMap = 
-               new LinkedHashMap<>(); 
-  
-        // Sort the list 
-        /*Collections.sort(list, new Comparator<Map.Entry<Integer, Integer>>() { 
-            public int compare(Map.Entry<Integer, Integer> o1,  
-                               Map.Entry<Integer, Integer> o2) 
-            { 
-                return (o1.getValue()).compareTo(o2.getValue()); 
-            } 
-        });*/
-        hm.entrySet()
-        .stream()
-        .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder())) 
-        .forEachOrdered(x -> reverseSortedMap.put(x.getKey(), x.getValue()));         
-          
-        // put data from sorted list to hashmap  
-       /* HashMap<Integer, Integer> temp = new LinkedHashMap<Integer, Integer>(); 
-        for (Map.Entry<Integer, Integer> aa : list) { 
-            temp.put(aa.getKey(), aa.getValue()); 
-        } */
-        return reverseSortedMap; 
-    }         
-
+    // function to sort hashmap by values 
+        public static HashMap<Integer, Integer> sortByValue(HashMap<Integer, Integer> hm) 
+        { 
+            // Create a list from elements of HashMap 
+            LinkedHashMap<Integer, Integer> reverseSortedMap = 
+                new LinkedHashMap<>(); 
+    
+            // Sort the list 
+            /*Collections.sort(list, new Comparator<Map.Entry<Integer, Integer>>() { 
+                public int compare(Map.Entry<Integer, Integer> o1,  
+                                Map.Entry<Integer, Integer> o2) 
+                { 
+                    return (o1.getValue()).compareTo(o2.getValue()); 
+                } 
+            });*/
+            hm.entrySet()
+            .stream()
+            .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder())) 
+            .forEachOrdered(x -> reverseSortedMap.put(x.getKey(), x.getValue()));         
+            
+            // put data from sorted list to hashmap  
+        /* HashMap<Integer, Integer> temp = new LinkedHashMap<Integer, Integer>(); 
+            for (Map.Entry<Integer, Integer> aa : list) { 
+                temp.put(aa.getKey(), aa.getValue()); 
+            } */
+            return reverseSortedMap; 
+        }  
     }
 }
