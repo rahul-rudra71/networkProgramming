@@ -13,6 +13,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.Map;
@@ -36,6 +38,8 @@ public class Peer2 {
 
     public static int noPrefNeighbors = 1; // Initializing at least to 1
     public static HashMap<Integer, Integer> prefNeighbor = new HashMap<Integer, Integer>();
+    public static long optUnchokingInt = 15; // Initializing to at least 15 secs
+    public static long unchokingInt = 5; // Initializing to at least 5 secs
 	public static void main(String[] args) throws Exception {
         //creating log file
         try {
@@ -94,6 +98,12 @@ public class Peer2 {
                 if(fileData[0].equals("NumberOfPreferredNeighbors")) {
                     noPrefNeighbors = Integer.parseInt(fileData[1]);
                 }
+                if(fileData[0].equals("UnchokingInterval")) {
+                    unchokingInt = Integer.parseInt(fileData[1]);
+                }
+                if(fileData[0].equals("OptimisticUnchokingInterval")) {
+                    optUnchokingInt = Integer.parseInt(fileData[1]);
+                }
             }
             myReader.close();
         } catch (FileNotFoundException e) {
@@ -101,6 +111,7 @@ public class Peer2 {
             e.printStackTrace();
         }
         String fileData = "";
+
         //This block reads in the current piece contents of the file meant to be transferred by the protocol
         try {
             File myObj = new File(metadata.get("FileName"));
@@ -169,6 +180,16 @@ public class Peer2 {
         System.out.println(pieces);
         System.out.println("bitfield: " + bitfield);
 
+        //Start Unchoke Timer
+        Timer timer = new Timer();
+        TimerTask task = new UnchokeTimer();
+        timer.schedule(task, 0, unchokingInt * 1000);
+
+        //Start Optimistically Unchoke Timer
+        Timer timer1 = new Timer();
+        TimerTask task1 = new OptUnchokeTimer();
+        timer1.schedule(task1, 0, optUnchokingInt * 1000);
+
         //connect to peers with lower id (peers we want to connect to)
         if(peerList.size() != 0) {
             for (String[] s : peerList) {
@@ -193,6 +214,26 @@ public class Peer2 {
         } finally {
     		listener.close();
     	} 
+    }
+
+    //Unchoke Timer
+    public static class UnchokeTimer extends TimerTask {
+        @Override
+        public void run () {
+            timeNow = LocalTime.now();
+            System.out.print("Unchoke Timer: ");
+            System.out.println(timeNow.format(timeFormat));
+        }
+    }
+
+    //Optimistic Unchoke Timer
+    public static class OptUnchokeTimer extends TimerTask {
+        @Override
+        public void run () {
+            timeNow = LocalTime.now();
+            System.out.print("Opt Unchoke Timer: ");
+            System.out.println(timeNow.format(timeFormat));
+        }
     }
 
     /* A peerhandler thread class. peerhandlers are spawned everytime you want to connect to a peer lower than yourself
@@ -273,6 +314,9 @@ public class Peer2 {
 
                                 //set choke status
                                 choked = false;
+
+                                prefNeighbor.put(peerID, 0);
+                                System.out.println(prefNeighbor);
                                 
                                 //iterate through servers bitfield and own bitfield and get list of pieces needed
                                 List<Integer> neededFromServer = new ArrayList<Integer>();
@@ -309,8 +353,17 @@ public class Peer2 {
                                 //add peerID --> interest pair to map
                                 peer_interest.add(peerID);
 
-                                outMessage = "00011";
-                                sendMessage(outMessage);
+                                if(prefNeighbor.size() < noPrefNeighbors) {
+                                    outMessage = "00011";
+                                    sendMessage(outMessage);
+
+                                    prefNeighbor.put(peerID, 0);
+                                    //System.out.println("check");
+                                    //System.out.println(noPrefNeighbors);
+                                    System.out.println(prefNeighbor);
+                                } else {
+                                    System.out.println("no room");
+                                }
 
                                 //write to log file
                                 timeNow = LocalTime.now();
@@ -643,6 +696,9 @@ public class Peer2 {
                                 //client peer has unchoked this server peer because it has previously sent an interest
                                 //message to the client peer, begin sending requests to client
                                 choked = false;
+
+                                prefNeighbor.put(peerID, 0);
+                                System.out.println(prefNeighbor);
                                 
                                 //iterate through servers bitfield and own bitfield and get list of pieces needed
                                 List<Integer> neededFromClient = new ArrayList<Integer>();
@@ -678,9 +734,16 @@ public class Peer2 {
                             if(msg_type.equals("2")) {
                                 //add peerID --> interest pair to map
                                 peer_interest.add(peerID);
+                                
+                                if(prefNeighbor.size() < noPrefNeighbors) {
+                                    outMessage = "00011";
+                                    sendMessage(outMessage);
 
-                                outMessage = "00011";
-                                sendMessage(outMessage);
+                                    prefNeighbor.put(peerID, 0);
+                                    System.out.println(prefNeighbor);
+                                } else {
+                                    System.out.println("no room");
+                                }
 
                                 //write to log file
                                 timeNow = LocalTime.now();
