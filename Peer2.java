@@ -44,7 +44,7 @@ public class Peer2 {
 	public static void main(String[] args) throws Exception {
         //creating log file
         try {
-            String logger_path = "project/log_peer_"+ Integer.toString(myID) +".log";
+            String logger_path = "/log_peer_"+ Integer.toString(myID) +".log";
             File myObj1 = new File(logger_path);
             myObj1.getParentFile().mkdirs(); 
             myObj1.createNewFile();
