@@ -40,7 +40,7 @@ public class Peer2 {
     public static HashMap<Integer, Integer> prefNeighbor = new HashMap<Integer, Integer>();
     public static long optUnchokingInt; 
     public static long unchokingInt; 
-    public static int theChosen;
+    public static int theChosen[] = {0,0};
 	public static void main(String[] args) throws Exception {
         //creating log file
         try {
@@ -223,7 +223,46 @@ public class Peer2 {
         public void run () {
             timeNow = LocalTime.now();
             System.out.print("Unchoke Timer: ");
-            System.out.println(timeNow.format(timeFormat));
+            //if preferred neighbors isn't at capacity it shouldn't matter
+            if (prefNeighbor.size() == noPrefNeighbors) {
+                if(peer_interest.contains(theChosen[0])) {
+                    Map.Entry<Integer, Integer> place = prefNeighbor.entrySet().iterator().next();
+                    int minHolder = place.getKey();
+                    int min = place.getValue();
+                    for(HashMap.Entry<Integer, Integer> g : prefNeighbor.entrySet()) {
+                        if (g.getValue() < min) {
+                            minHolder = g.getKey();
+                            min = g.getValue();
+
+                            prefNeighbor.put(g.getKey(), 0);
+                        }
+                    }
+                    if (min < theChosen[1]) {
+                        for (peerHandler p : allConnected_peer) {
+                            if(minHolder == p.myPartner()) {
+                                System.out.println("choke peer: " + Integer.toString(minHolder));
+                                prefNeighbor.remove(minHolder);
+                                p.sendMessage("00010");
+                            }
+                            if(theChosen[1] == p.myPartner()) {
+                                System.out.println("add chosen to pref neighbor: " + Integer.toString(theChosen[1]));
+                                prefNeighbor.put(theChosen[0], 0);
+                            }
+                        }
+                        for (Handler h : allConnected_hand) {
+                            if(minHolder == h.myPartner()) {
+                                System.out.println("choke peer: " + Integer.toString(minHolder));
+                                prefNeighbor.remove(minHolder);
+                                h.sendMessage("00010");
+                            }
+                            if(theChosen[1] == h.myPartner()) {
+                                System.out.println("add chosen to pref neighbor: " + Integer.toString(theChosen[1]));
+                                prefNeighbor.put(theChosen[0], 0);
+                            }
+                        }
+                    }
+                } 
+            }
         }
     }
 
@@ -241,12 +280,13 @@ public class Peer2 {
 
             if(temp.size() != 0) {
                 int release = temp.get((int) (Math.random() * (temp.size() - 1)));
-                if(theChosen == release) {
-                    System.out.println("The choosen one strikes again");                 
+                if(theChosen[0] == release) {
+                    System.out.println("The choosen one strikes again");   
+                    theChosen[1] = 0;                 
                 } else {
                     for (peerHandler p : allConnected_peer) {
-                        if(theChosen == p.myPartner()) {
-                            System.out.print("choke peer: " + Integer.toString(theChosen));
+                        if(theChosen[0] == p.myPartner()) {
+                            System.out.print("choke peer: " + Integer.toString(theChosen[1]));
                             p.sendMessage("00010");
                         }
                         if(release == p.myPartner()) {
@@ -255,8 +295,8 @@ public class Peer2 {
                         }
                     }
                     for (Handler h : allConnected_hand) {
-                        if(theChosen == h.myPartner()) {
-                            System.out.print("choke peer: " + Integer.toString(theChosen));
+                        if(theChosen[0] == h.myPartner()) {
+                            System.out.print("choke peer: " + Integer.toString(theChosen[1]));
                             h.sendMessage("00010");
                         }
                         if(release == h.myPartner()) {
@@ -264,7 +304,8 @@ public class Peer2 {
                             h.sendMessage("00011");
                         }
                     }
-                    theChosen = release;
+                    theChosen[0] = release;
+                    theChosen[1] = 0;                
                 }
             } else {
                 System.out.println("no change");
@@ -533,6 +574,14 @@ public class Peer2 {
                                 }
                                 if(terminado) {
                                     System.out.println("Terminado");
+                                }
+
+                                //datarates
+                                if(prefNeighbor.containsKey(myID)) {
+                                    prefNeighbor.put(myID, prefNeighbor.get(myID) + 1);
+                                }
+                                if(theChosen[0] == myID) {
+                                    theChosen[1] = theChosen[1] + 1;
                                 }
 
                                 //iterate through servers bitfield and own bitfield and get list of pieces still needed
@@ -818,6 +867,14 @@ public class Peer2 {
                                 }
                                 if(terminado) {
                                     System.out.println("Terminado!");
+                                }
+
+                                //datarates
+                                if(prefNeighbor.containsKey(myID)) {
+                                    prefNeighbor.put(myID, prefNeighbor.get(myID) + 1);
+                                }
+                                if(theChosen[0] == myID) {
+                                    theChosen[1] = theChosen[1] + 1;
                                 }
 
                                 //reevaluate interest
