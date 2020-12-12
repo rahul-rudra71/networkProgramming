@@ -163,23 +163,17 @@ public class Peer2 {
         }
 
         //creating everyone's bitfields
-        for(HashMap.Entry<Integer, String> poop : peer_bits.entrySet()) {
-            if( (poop.getValue()).equals("0") ) {
+        for(HashMap.Entry<Integer, String> button : peer_bits.entrySet()) {
+            if( (button.getValue()).equals("0") ) {
                 for(int i = 0; i < bitfield.length() -1; i++) {
-                    peer_bits.put(poop.getKey(), poop.getValue() + "0");
+                    peer_bits.put(button.getKey(), button.getValue() + "0");
                 }
             } else {
                 for(int i = 0; i < bitfield.length() -1; i++) {
-                    peer_bits.put(poop.getKey(), poop.getValue() + "1");
+                    peer_bits.put(button.getKey(), button.getValue() + "1");
                 }
             }
-            System.out.println(poop.getKey() + " = " + poop.getValue());
         }
-
-        //for visual confirmation
-        System.out.print("pieces: ");
-        System.out.println(pieces);
-        System.out.println("bitfield: " + bitfield);
 
         //Start Unchoke Timer
         Timer timer = new Timer();
@@ -198,19 +192,15 @@ public class Peer2 {
                 allConnected_peer.add(p);
                 p.start();
             }
-        } else {
-            System.out.println("I am Top");
-        }
+        } 
 
         //Here we begin handling our peers who connect to us
-		System.out.println("The Peer"+ myID +" is running."); 
         ServerSocket listener = new ServerSocket(sPort);
         try {
         	while(true) {
             	Handler h = new Handler(listener.accept(), allConnected_peer, allConnected_hand);
                 allConnected_hand.add(h);
                 h.start();
-                System.out.println("Someone is attempting to connect!");
     		}
         } finally {
     		listener.close();
@@ -222,7 +212,6 @@ public class Peer2 {
         @Override
         public void run () {
             timeNow = LocalTime.now();
-            System.out.print("Unchoke Timer: ");
             //if preferred neighbors isn't at capacity it shouldn't matter
             if (prefNeighbor.size() == noPrefNeighbors) {
                 if(peer_interest.contains(theChosen[0])) {
@@ -240,23 +229,19 @@ public class Peer2 {
                     if (min < theChosen[1]) {
                         for (peerHandler p : allConnected_peer) {
                             if(minHolder == p.myPartner()) {
-                                System.out.println("choke peer: " + Integer.toString(minHolder));
                                 prefNeighbor.remove(minHolder);
                                 p.sendMessage("00010");
                             }
                             if(theChosen[1] == p.myPartner()) {
-                                System.out.println("add chosen to pref neighbor: " + Integer.toString(theChosen[1]));
                                 prefNeighbor.put(theChosen[0], 0);
                             }
                         }
                         for (Handler h : allConnected_hand) {
                             if(minHolder == h.myPartner()) {
-                                System.out.println("choke peer: " + Integer.toString(minHolder));
                                 prefNeighbor.remove(minHolder);
                                 h.sendMessage("00010");
                             }
                             if(theChosen[1] == h.myPartner()) {
-                                System.out.println("add chosen to pref neighbor: " + Integer.toString(theChosen[1]));
                                 prefNeighbor.put(theChosen[0], 0);
                             }
                         }
@@ -270,7 +255,6 @@ public class Peer2 {
     public static class OptUnchokeTimer extends TimerTask {
         @Override
         public void run () {
-            System.out.print("Opt Unchoke Timer: ");
             List<Integer> temp = new ArrayList<Integer>();
             for(int i : peer_interest) {
                 if(!prefNeighbor.containsKey(i)) {
@@ -281,34 +265,27 @@ public class Peer2 {
             if(temp.size() != 0) {
                 int release = temp.get((int) (Math.random() * (temp.size() - 1)));
                 if(theChosen[0] == release) {
-                    System.out.println("The choosen one strikes again");   
                     theChosen[1] = 0;                 
                 } else {
                     for (peerHandler p : allConnected_peer) {
                         if(theChosen[0] == p.myPartner()) {
-                            System.out.print("choke peer: " + Integer.toString(theChosen[1]));
                             p.sendMessage("00010");
                         }
                         if(release == p.myPartner()) {
-                            System.out.println("unchoke peer: " + Integer.toString(release));
                             p.sendMessage("00011");
                         }
                     }
                     for (Handler h : allConnected_hand) {
                         if(theChosen[0] == h.myPartner()) {
-                            System.out.print("choke peer: " + Integer.toString(theChosen[1]));
                             h.sendMessage("00010");
                         }
                         if(release == h.myPartner()) {
-                            System.out.println("unchoke peer: " + Integer.toString(release));
                             h.sendMessage("00011");
                         }
                     }
                     theChosen[0] = release;
                     theChosen[1] = 0;                
                 }
-            } else {
-                System.out.println("no change");
             }
         }
     }
@@ -341,7 +318,6 @@ public class Peer2 {
                 try {
                     //create a socket to connect to the server
                     requestSocket = new Socket(peerdest, peerPort);
-                    System.out.println("Attempting to connect to "+ peerdest +" in "+ Integer.toString(peerPort) +" [Peer "+ peerID +"]");
 
                     //initialize input/output streams
                     out = new ObjectOutputStream(requestSocket.getOutputStream());
@@ -364,8 +340,6 @@ public class Peer2 {
                     while(true) {
                         //receive the message sent from the client
                         inMessage = (String)in.readObject();
-                        //show the message to the user
-                        System.out.println("Receive message: " + inMessage + " from Peer " + peerID);
 
                         //if statement determines if first message is handshake
                         //if handshake was successful enter if
@@ -393,7 +367,6 @@ public class Peer2 {
                                 choked = false;
 
                                 prefNeighbor.put(peerID, 0);
-                                System.out.println(prefNeighbor);
                                 
                                 //iterate through servers bitfield and own bitfield and get list of pieces needed
                                 List<Integer> neededFromServer = new ArrayList<Integer>();
@@ -435,12 +408,7 @@ public class Peer2 {
                                     sendMessage(outMessage);
 
                                     prefNeighbor.put(peerID, 0);
-                                    System.out.println("check");
-                                    System.out.println(noPrefNeighbors);
-                                    System.out.println(prefNeighbor.size());
-                                } else {
-                                    System.out.println("no room");
-                                }
+                                } 
 
                                 //write to log file
                                 timeNow = LocalTime.now();
@@ -466,9 +434,8 @@ public class Peer2 {
                                 peer_bits.put(peerID, temp_field);
 
                                 //determine whether it is time to terminate
-                                System.out.println(peer_bits);
-                                for(HashMap.Entry<Integer, String> poop : peer_bits.entrySet()) {
-                                    if( (poop.getValue()).contains("0") || bitfield.contains("0")) {
+                                for(HashMap.Entry<Integer, String> button : peer_bits.entrySet()) {
+                                    if( (button.getValue()).contains("0") || bitfield.contains("0")) {
                                         terminado = false;
                                         break;
                                     } 
@@ -557,7 +524,6 @@ public class Peer2 {
                                 String index_contents = contents.substring(0,4);
                                 String piece_contents = contents.substring(4, contents.length());
                                 pieces.set(Integer.parseInt(index_contents), piece_contents);
-                                System.out.println("Piece obtained: " + piece_contents);
 
                                 //send have message to connected peers, change contents of bitfield
                                 bitfield = bitfield.substring(0, Integer.parseInt(index_contents)) + "1" + bitfield.substring(Integer.parseInt(index_contents) + 1);
@@ -565,8 +531,8 @@ public class Peer2 {
                                 outMessage = "00054" + index_contents;
                                 sendToAll(outMessage);
  
-                                for(HashMap.Entry<Integer, String> poop : peer_bits.entrySet()) {
-                                    if( (poop.getValue()).contains("0") || bitfield.contains("0")) {
+                                for(HashMap.Entry<Integer, String> button : peer_bits.entrySet()) {
+                                    if( (button.getValue()).contains("0") || bitfield.contains("0")) {
                                         terminado = false;
                                         break;
                                     } 
@@ -619,13 +585,11 @@ public class Peer2 {
                             //if first message is P2P, handshake is successful 
                             if((inMessage.substring(0, 18)).equals("P2PFILESHARINGPROJ")) {
                                 if(peerID == Integer.parseInt(inMessage.substring(inMessage.length() - 4))) {
-                                    System.out.println("Handshake with peer " + Integer.toString(peerID) + " successful");
                                     shake = true;
     
                                     //write to log file
                                     timeNow = LocalTime.now();
                                     logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] makes a connection to Peer ["+ Integer.toString(peerID) +"]\n");
-                                    //logger.close();
     
                                     //send bitfield message to new peer connection to be used in establishing piece interest
                                     //zero pad length field if needed
@@ -695,7 +659,6 @@ public class Peer2 {
             try {
                 out.writeObject(msg);
                 out.flush();
-                System.out.println("Send message: " + msg + " to Peer " + Integer.toString(peerID));
             } catch(IOException ioException) {
                 ioException.printStackTrace();
             }
@@ -708,7 +671,6 @@ public class Peer2 {
             for (Handler h : allConnected_hand) {
                 h.sendMessage(msg);
             }
-            System.out.println("Done");
         }
 
         public int myPartner() {
@@ -761,8 +723,6 @@ public class Peer2 {
                         //if statement determines if first message is handshake
                         //if handshake was successful enter if
                         if(shake) {
-                            //show the message to the user
-                            System.out.println("Receive message: " + inMessage + " from Peer " + peerID);
                             // add parsing logic from peerHandler class here
                             // Delimit the message length and type from the received byte-string
                             length = Integer.parseInt(inMessage.substring(0,4));
@@ -787,7 +747,6 @@ public class Peer2 {
                                 choked = false;
 
                                 prefNeighbor.put(peerID, 0);
-                                System.out.println(prefNeighbor);
                                 
                                 //iterate through servers bitfield and own bitfield and get list of pieces needed
                                 List<Integer> neededFromClient = new ArrayList<Integer>();
@@ -829,10 +788,7 @@ public class Peer2 {
                                     sendMessage(outMessage);
 
                                     prefNeighbor.put(peerID, 0);
-                                    System.out.println(prefNeighbor);
-                                } else {
-                                    System.out.println("no room");
-                                }
+                                } 
 
                                 //write to log file
                                 timeNow = LocalTime.now();
@@ -857,9 +813,8 @@ public class Peer2 {
                                 peer_bits.put(peerID, temp_field);
 
                                 //determine whether it is time to terminate
-                                System.out.println(peer_bits);
-                                for(HashMap.Entry<Integer, String> poop : peer_bits.entrySet()) {
-                                    if( (poop.getValue()).contains("0") || bitfield.contains("0")) {
+                                for(HashMap.Entry<Integer, String> button : peer_bits.entrySet()) {
+                                    if( (button.getValue()).contains("0") || bitfield.contains("0")) {
                                         terminado = false;
                                         break;
                                     } 
@@ -983,8 +938,8 @@ public class Peer2 {
                                 outMessage = "00054" + index_contents;
                                 sendToAll(outMessage);
 
-                                for(HashMap.Entry<Integer, String> poop : peer_bits.entrySet()) {
-                                    if( (poop.getValue()).contains("0") || bitfield.contains("0")) {
+                                for(HashMap.Entry<Integer, String> button : peer_bits.entrySet()) {
+                                    if( (button.getValue()).contains("0") || bitfield.contains("0")) {
                                         terminado = false;
                                         break;
                                     } 
@@ -1030,10 +985,6 @@ public class Peer2 {
                             if((inMessage.substring(0, 18)).equals("P2PFILESHARINGPROJ")) {
                                 peerID = Integer.parseInt(inMessage.substring(inMessage.length() - 4));
 
-                                //show the message to the user
-                                System.out.println("Receive message: " + inMessage + " from Peer " +peerID);
-                                System.out.println("Handshake with peer " + Integer.toString(peerID) + " successful");
-
                                 //write to log file
                                 timeNow = LocalTime.now();
                                 logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] is connected from Peer ["+ Integer.toString(peerID) +"]\n");
@@ -1044,7 +995,6 @@ public class Peer2 {
                                 shake = true;
                             //otherwise bad handshake and disconnect
                             } else {
-                                System.out.println("Received message: " + inMessage);
                                 System.out.println("bad handshake");
                                 outMessage = "bad handshake";
                                 out.writeObject(outMessage);
@@ -1077,7 +1027,6 @@ public class Peer2 {
             try {
                 out.writeObject(msg);
                 out.flush();
-                System.out.println("Send message: " + msg + " to Peer "+ peerID);
             } catch(IOException ioException) {
                 ioException.printStackTrace();
             }
@@ -1090,7 +1039,6 @@ public class Peer2 {
             for (Handler h : allConnected_hand) {
                 h.sendMessage(msg);
             }
-            System.out.println("Done");
         }
 
         public int myPartner() {
