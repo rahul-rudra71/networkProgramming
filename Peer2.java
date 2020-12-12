@@ -13,6 +13,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.Map;
@@ -21,11 +23,7 @@ import java.lang.Math;
 public class Peer2 {
 
     //this is just for testing we will need to change this later to project specifications
-<<<<<<< HEAD
-    private static final int myID = 1001;   //The peer will have this ID
-=======
     private static final int myID = 1004;   //The peer will have this ID
->>>>>>> 006b6b3fb736e8b1ed0eb5c3becb92cbd98534a8
     public static String bitfield = "";
     public static HashMap<Integer, String> peer_bits = new HashMap<Integer, String>();
     public static List<Integer> peer_interest = new ArrayList<Integer>();
@@ -37,15 +35,12 @@ public class Peer2 {
 
     public static List<peerHandler> allConnected_peer = new ArrayList<peerHandler>();
     public static List<Handler> allConnected_hand = new ArrayList<Handler>();
-<<<<<<< HEAD
-=======
 
     public static int noPrefNeighbors; 
     public static HashMap<Integer, Integer> prefNeighbor = new HashMap<Integer, Integer>();
     public static long optUnchokingInt; 
     public static long unchokingInt; 
-    public static int theChosen;
->>>>>>> 006b6b3fb736e8b1ed0eb5c3becb92cbd98534a8
+    public static int theChosen[] = {0,0};
 	public static void main(String[] args) throws Exception {
         //creating log file
         try {
@@ -76,6 +71,8 @@ public class Peer2 {
                     sPort = Integer.parseInt(peerData[2]);
                     if(Integer.parseInt(peerData[3]) == 1)
                         hasFile = 1;
+                } else {
+                    peer_bits.put(peerID, peerData[3]);
                 }
                 //if peer id is lower than ours add it to arraylist
                 //each line is put into array split by spaces
@@ -98,6 +95,16 @@ public class Peer2 {
             while(myReader.hasNextLine()) {
                 String[] fileData = (myReader.nextLine()).split(" ");
                 metadata.put(fileData[0], fileData[1]);
+                
+                if(fileData[0].equals("NumberOfPreferredNeighbors")) {
+                    noPrefNeighbors = Integer.parseInt(fileData[1]);
+                }
+                if(fileData[0].equals("UnchokingInterval")) {
+                    unchokingInt = Integer.parseInt(fileData[1]);
+                }
+                if(fileData[0].equals("OptimisticUnchokingInterval")) {
+                    optUnchokingInt = Integer.parseInt(fileData[1]);
+                }
             }
             myReader.close();
         } catch (FileNotFoundException e) {
@@ -105,6 +112,7 @@ public class Peer2 {
             e.printStackTrace();
         }
         String fileData = "";
+
         //This block reads in the current piece contents of the file meant to be transferred by the protocol
         try {
             File myObj = new File(metadata.get("FileName"));
@@ -154,10 +162,34 @@ public class Peer2 {
             }
         }
 
+        //creating everyone's bitfields
+        for(HashMap.Entry<Integer, String> poop : peer_bits.entrySet()) {
+            if( (poop.getValue()).equals("0") ) {
+                for(int i = 0; i < bitfield.length() -1; i++) {
+                    peer_bits.put(poop.getKey(), poop.getValue() + "0");
+                }
+            } else {
+                for(int i = 0; i < bitfield.length() -1; i++) {
+                    peer_bits.put(poop.getKey(), poop.getValue() + "1");
+                }
+            }
+            System.out.println(poop.getKey() + " = " + poop.getValue());
+        }
+
         //for visual confirmation
         System.out.print("pieces: ");
         System.out.println(pieces);
         System.out.println("bitfield: " + bitfield);
+
+        //Start Unchoke Timer
+        Timer timer = new Timer();
+        TimerTask task = new UnchokeTimer();
+        timer.schedule(task, 0, unchokingInt * 1000);
+
+        //Start Optimistically Unchoke Timer
+        Timer timer1 = new Timer();
+        TimerTask task1 = new OptUnchokeTimer();
+        timer1.schedule(task1, 0, optUnchokingInt * 1000);
 
         //connect to peers with lower id (peers we want to connect to)
         if(peerList.size() != 0) {
@@ -191,7 +223,60 @@ public class Peer2 {
         public void run () {
             timeNow = LocalTime.now();
             System.out.print("Unchoke Timer: ");
-            System.out.println(timeNow.format(timeFormat));
+            //if preferred neighbors isn't at capacity it shouldn't matter
+            if (prefNeighbor.size() == noPrefNeighbors) {
+                if(peer_interest.contains(theChosen[0])) {
+                    Map.Entry<Integer, Integer> place = prefNeighbor.entrySet().iterator().next();
+                    int minHolder = place.getKey();
+                    int min = place.getValue();
+                    for(HashMap.Entry<Integer, Integer> g : prefNeighbor.entrySet()) {
+                        if (g.getValue() < min) {
+                            minHolder = g.getKey();
+                            min = g.getValue();
+
+                            prefNeighbor.put(g.getKey(), 0);
+                        }
+                    }
+                    if (min < theChosen[1]) {
+                        for (peerHandler p : allConnected_peer) {
+                            if(minHolder == p.myPartner()) {
+                                System.out.println("choke peer: " + Integer.toString(minHolder));
+                                prefNeighbor.remove(minHolder);
+                                p.sendMessage("00010");
+                            }
+                            if(theChosen[1] == p.myPartner()) {
+                                System.out.println("add chosen to pref neighbor: " + Integer.toString(theChosen[1]));
+                                prefNeighbor.put(theChosen[0], 0);
+                            }
+                        }
+                        for (Handler h : allConnected_hand) {
+                            if(minHolder == h.myPartner()) {
+                                System.out.println("choke peer: " + Integer.toString(minHolder));
+                                prefNeighbor.remove(minHolder);
+                                h.sendMessage("00010");
+                            }
+                            if(theChosen[1] == h.myPartner()) {
+                                System.out.println("add chosen to pref neighbor: " + Integer.toString(theChosen[1]));
+                                prefNeighbor.put(theChosen[0], 0);
+                            }
+                        }  
+                        ArrayList<String> final_set = new ArrayList<String>();
+                        int index = 0;
+                        for(HashMap.Entry<Integer, Integer> g : prefNeighbor.entrySet()) {
+                            final_set.add(Integer.toString(g.getKey()));
+                            index++;
+                        }
+
+                        //write to log file
+                        timeNow = LocalTime.now();
+                        try{
+                            logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] has preferred neighbors " + final_set + "\n");
+                        }catch(IOException e){
+
+                        }
+                    }
+                } 
+            }
         }
     }
 
@@ -209,30 +294,48 @@ public class Peer2 {
 
             if(temp.size() != 0) {
                 int release = temp.get((int) (Math.random() * (temp.size() - 1)));
-                if(theChosen == release) {
-                    System.out.println("The choosen one strikes again");                 
+                if(theChosen[0] == release) {
+                    System.out.println("The choosen one strikes again");   
+                    theChosen[1] = 0;                 
                 } else {
                     for (peerHandler p : allConnected_peer) {
-                        if(theChosen == p.myPartner()) {
-                            System.out.print("choke peer: " + Integer.toString(theChosen));
+                        if(theChosen[0] == p.myPartner()) {
+                            System.out.print("choke peer: " + Integer.toString(theChosen[1]));
                             p.sendMessage("00010");
                         }
                         if(release == p.myPartner()) {
                             System.out.println("unchoke peer: " + Integer.toString(release));
                             p.sendMessage("00011");
+
+                             //write to log file
+                             timeNow = LocalTime.now();
+                             try{
+                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] has optimistically unchoked neighbor" + Integer.toString(theChosen[1]) + "\n");
+                             }catch(IOException e){
+
+                             }
                         }
                     }
                     for (Handler h : allConnected_hand) {
-                        if(theChosen == h.myPartner()) {
-                            System.out.print("choke peer: " + Integer.toString(theChosen));
+                        if(theChosen[0] == h.myPartner()) {
+                            System.out.print("choke peer: " + Integer.toString(theChosen[1]));
                             h.sendMessage("00010");
                         }
                         if(release == h.myPartner()) {
                             System.out.println("unchoke peer: " + Integer.toString(release));
                             h.sendMessage("00011");
+
+                            //write to log file
+                            timeNow = LocalTime.now();
+                            try{
+                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] has optimistically unchoked neighbor" + Integer.toString(theChosen[1]) + "\n");
+                            }catch(IOException e){
+
+                            }
                         }
                     }
-                    theChosen = release;
+                    theChosen[0] = release;
+                    theChosen[1] = 0;                
                 }
             } else {
                 System.out.println("no change");
@@ -276,6 +379,7 @@ public class Peer2 {
                     in = new ObjectInputStream(requestSocket.getInputStream());
                     boolean shake = false;
                     boolean choked = true;
+                    boolean terminado = false;
                     int length = 0;
                     String msg_type = "";
                     String contents = "";
@@ -317,6 +421,9 @@ public class Peer2 {
 
                                 //set choke status
                                 choked = false;
+
+                                prefNeighbor.put(peerID, 0);
+                                System.out.println(prefNeighbor);
                                 
                                 //iterate through servers bitfield and own bitfield and get list of pieces needed
                                 List<Integer> neededFromServer = new ArrayList<Integer>();
@@ -384,14 +491,23 @@ public class Peer2 {
                             // Have --> 4
                             if(msg_type.equals("4")) {
                                 //received have message from server peer, update their bitfield value in peer_bits hashmap
-                                if(peer_bits.containsValue(peerID)){
-                                    String temp_field = peer_bits.get(peerID);
-                                    temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
-                                    peer_bits.put(peerID, temp_field);
-                                }else{
-                                    String temp_field = bitfield.replace('1', '0');
-                                    temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
-                                    peer_bits.put(peerID, temp_field);
+                                String temp_field = peer_bits.get(peerID);
+                                temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
+                                peer_bits.put(peerID, temp_field);
+
+                                //determine whether it is time to terminate
+                                System.out.println(peer_bits);
+                                for(HashMap.Entry<Integer, String> poop : peer_bits.entrySet()) {
+                                    if( (poop.getValue()).contains("0") || bitfield.contains("0")) {
+                                        terminado = false;
+                                        break;
+                                    } 
+                                    terminado = true;
+                                }
+                                if(terminado) {
+                                     //write to log file
+                                     timeNow = LocalTime.now();
+                                     logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] has downloaded the complete file.\n");
                                 }
 
                                 //reevaluate interest
@@ -480,6 +596,31 @@ public class Peer2 {
 
                                 outMessage = "00054" + index_contents;
                                 sendToAll(outMessage);
+
+                                //write to log file
+                                timeNow = LocalTime.now();
+                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] has downloaded piece ["+ index_contents + "] from " + Integer.toString(peerID) +"]\n");
+ 
+                                for(HashMap.Entry<Integer, String> poop : peer_bits.entrySet()) {
+                                    if( (poop.getValue()).contains("0") || bitfield.contains("0")) {
+                                        terminado = false;
+                                        break;
+                                    } 
+                                    terminado = true;
+                                }
+                                if(terminado) {
+                                     //write to log file
+                                     timeNow = LocalTime.now();
+                                     logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] has downloaded the complete file.\n");
+                                }
+
+                                //datarates
+                                if(prefNeighbor.containsKey(myID)) {
+                                    prefNeighbor.put(myID, prefNeighbor.get(myID) + 1);
+                                }
+                                if(theChosen[0] == myID) {
+                                    theChosen[1] = theChosen[1] + 1;
+                                }
 
                                 //iterate through servers bitfield and own bitfield and get list of pieces still needed
                                 List<Integer> neededFromServer = new ArrayList<Integer>();
@@ -642,6 +783,7 @@ public class Peer2 {
                 in = new ObjectInputStream(connection.getInputStream());
                 boolean shake = false;
                 boolean choked = true;
+                boolean terminado = false;
                 String msg_type = "";
                 int length = 0;
                 String contents = "";
@@ -681,6 +823,9 @@ public class Peer2 {
                                 //client peer has unchoked this server peer because it has previously sent an interest
                                 //message to the client peer, begin sending requests to client
                                 choked = false;
+
+                                prefNeighbor.put(peerID, 0);
+                                System.out.println(prefNeighbor);
                                 
                                 //iterate through servers bitfield and own bitfield and get list of pieces needed
                                 List<Integer> neededFromClient = new ArrayList<Integer>();
@@ -716,8 +861,16 @@ public class Peer2 {
                             if(msg_type.equals("2")) {
                                 //add peerID --> interest pair to map
                                 peer_interest.add(peerID);
-                                outMessage = "00011";
-                                sendMessage(outMessage);
+                                
+                                if(prefNeighbor.size() < noPrefNeighbors) {
+                                    outMessage = "00011";
+                                    sendMessage(outMessage);
+
+                                    prefNeighbor.put(peerID, 0);
+                                    System.out.println(prefNeighbor);
+                                } else {
+                                    System.out.println("no room");
+                                }
 
                                 //write to log file
                                 timeNow = LocalTime.now();
@@ -737,14 +890,31 @@ public class Peer2 {
                             // Have --> 4
                             if(msg_type.equals("4")) {
                                 //received have message from client peer, update their bitfield value in peer_bits hashmap
-                                if(peer_bits.containsValue(peerID)){
-                                    String temp_field = peer_bits.get(peerID);
-                                    temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
-                                    peer_bits.put(peerID, temp_field);
-                                }else{
-                                    String temp_field = bitfield.replace('1', '0');
-                                    temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
-                                    peer_bits.put(peerID, temp_field);
+                                String temp_field = peer_bits.get(peerID);
+                                temp_field = temp_field.substring(0, Integer.parseInt(contents)) + "1" + temp_field.substring(Integer.parseInt(contents) + 1);
+                                peer_bits.put(peerID, temp_field);
+
+                                //determine whether it is time to terminate
+                                System.out.println(peer_bits);
+                                for(HashMap.Entry<Integer, String> poop : peer_bits.entrySet()) {
+                                    if( (poop.getValue()).contains("0") || bitfield.contains("0")) {
+                                        terminado = false;
+                                        break;
+                                    } 
+                                    terminado = true;
+                                }
+                                if(terminado) {
+                                     //write to log file
+                                     timeNow = LocalTime.now();
+                                     logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] has downloaded the complete file.\n");
+                                }
+
+                                //datarates
+                                if(prefNeighbor.containsKey(myID)) {
+                                    prefNeighbor.put(myID, prefNeighbor.get(myID) + 1);
+                                }
+                                if(theChosen[0] == myID) {
+                                    theChosen[1] = theChosen[1] + 1;
                                 }
 
                                 //reevaluate interest
@@ -852,6 +1022,53 @@ public class Peer2 {
 
                                 outMessage = "00054" + index_contents;
                                 sendToAll(outMessage);
+
+                                //write to log file
+                                timeNow = LocalTime.now();
+                                logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] has downloaded piece ["+ index_contents + "] from " + Integer.toString(peerID) +"]\n");
+
+                                for(HashMap.Entry<Integer, String> poop : peer_bits.entrySet()) {
+                                    if( (poop.getValue()).contains("0") || bitfield.contains("0")) {
+                                        terminado = false;
+                                        break;
+                                    } 
+                                    terminado = true;
+                                }
+                                if(terminado) {
+                                    //write to log file
+                                    timeNow = LocalTime.now();
+                                    logger.write("["+ timeNow.format(timeFormat) +"]: Peer ["+ Integer.toString(myID) +"] has downloaded the complete file.\n");
+                                }
+
+                                //iterate through servers bitfield and own bitfield and get list of pieces still needed
+                                List<Integer> neededFromServer = new ArrayList<Integer>();
+                                for(int i = 0; i < bitfield.length(); i++){
+                                    if(Integer.parseInt(bitfield.substring(i, i+1)) < Integer.parseInt(peer_bits.get(peerID).substring(i, i+1))){
+                                        neededFromServer.add(i);
+                                    }
+                                }
+
+                                //request new piece if there are more that can be transferred
+                                if((neededFromServer.size() != 0) && (choked == false)){
+                                    int requested = (int) (Math.random() * neededFromServer.size());
+                                    zero_pad = Integer.toString(neededFromServer.get(requested));
+
+                                    //zero pad index field if needed
+                                    if(zero_pad.length() < 4){
+                                        length_bytes = zero_pad.length();
+                                        for(int i = 0; i < (4 - length_bytes); i++){
+                                            zero_pad = "0" + zero_pad;
+                                        }
+                                    }
+
+                                    //construct message, length will always be 5 for type + index
+                                    outMessage = "00056" + zero_pad;
+                                    sendMessage(outMessage);
+                                    
+                                    zero_pad = "";
+                                }else{
+                                    //end requesting loop, no more pieces needed from this server
+                                }
                             }
                             
                         } else {
