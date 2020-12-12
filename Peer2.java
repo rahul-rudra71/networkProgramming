@@ -21,7 +21,11 @@ import java.lang.Math;
 public class Peer2 {
 
     //this is just for testing we will need to change this later to project specifications
+<<<<<<< HEAD
     private static final int myID = 1001;   //The peer will have this ID
+=======
+    private static final int myID = 1004;   //The peer will have this ID
+>>>>>>> 006b6b3fb736e8b1ed0eb5c3becb92cbd98534a8
     public static String bitfield = "";
     public static HashMap<Integer, String> peer_bits = new HashMap<Integer, String>();
     public static List<Integer> peer_interest = new ArrayList<Integer>();
@@ -33,6 +37,15 @@ public class Peer2 {
 
     public static List<peerHandler> allConnected_peer = new ArrayList<peerHandler>();
     public static List<Handler> allConnected_hand = new ArrayList<Handler>();
+<<<<<<< HEAD
+=======
+
+    public static int noPrefNeighbors; 
+    public static HashMap<Integer, Integer> prefNeighbor = new HashMap<Integer, Integer>();
+    public static long optUnchokingInt; 
+    public static long unchokingInt; 
+    public static int theChosen;
+>>>>>>> 006b6b3fb736e8b1ed0eb5c3becb92cbd98534a8
 	public static void main(String[] args) throws Exception {
         //creating log file
         try {
@@ -172,6 +185,61 @@ public class Peer2 {
     	} 
     }
 
+    //Unchoke Timer
+    public static class UnchokeTimer extends TimerTask {
+        @Override
+        public void run () {
+            timeNow = LocalTime.now();
+            System.out.print("Unchoke Timer: ");
+            System.out.println(timeNow.format(timeFormat));
+        }
+    }
+
+    //Optimistic Unchoke Timer
+    public static class OptUnchokeTimer extends TimerTask {
+        @Override
+        public void run () {
+            System.out.print("Opt Unchoke Timer: ");
+            List<Integer> temp = new ArrayList<Integer>();
+            for(int i : peer_interest) {
+                if(!prefNeighbor.containsKey(i)) {
+                    temp.add(i);
+                }
+            }
+
+            if(temp.size() != 0) {
+                int release = temp.get((int) (Math.random() * (temp.size() - 1)));
+                if(theChosen == release) {
+                    System.out.println("The choosen one strikes again");                 
+                } else {
+                    for (peerHandler p : allConnected_peer) {
+                        if(theChosen == p.myPartner()) {
+                            System.out.print("choke peer: " + Integer.toString(theChosen));
+                            p.sendMessage("00010");
+                        }
+                        if(release == p.myPartner()) {
+                            System.out.println("unchoke peer: " + Integer.toString(release));
+                            p.sendMessage("00011");
+                        }
+                    }
+                    for (Handler h : allConnected_hand) {
+                        if(theChosen == h.myPartner()) {
+                            System.out.print("choke peer: " + Integer.toString(theChosen));
+                            h.sendMessage("00010");
+                        }
+                        if(release == h.myPartner()) {
+                            System.out.println("unchoke peer: " + Integer.toString(release));
+                            h.sendMessage("00011");
+                        }
+                    }
+                    theChosen = release;
+                }
+            } else {
+                System.out.println("no change");
+            }
+        }
+    }
+
     /* A peerhandler thread class. peerhandlers are spawned everytime you want to connect to a peer lower than yourself
     This is the client perspective of the project*/
     private static class peerHandler extends Thread {
@@ -284,6 +352,18 @@ public class Peer2 {
                             if(msg_type.equals("2")) {
                                 //add peerID --> interest pair to map
                                 peer_interest.add(peerID);
+
+                                if(prefNeighbor.size() < noPrefNeighbors) {
+                                    outMessage = "00011";
+                                    sendMessage(outMessage);
+
+                                    prefNeighbor.put(peerID, 0);
+                                    System.out.println("check");
+                                    System.out.println(noPrefNeighbors);
+                                    System.out.println(prefNeighbor.size());
+                                } else {
+                                    System.out.println("no room");
+                                }
 
                                 //write to log file
                                 timeNow = LocalTime.now();
@@ -527,6 +607,10 @@ public class Peer2 {
             }
             System.out.println("Done");
         }
+
+        public int myPartner() {
+            return peerID;
+        }
     }
 
     //code in Handler and peerHandler is largely the same with similar logic. difference in loop structure due to handshake
@@ -669,7 +753,6 @@ public class Peer2 {
                                 if(peer_interest.contains(peerID)){
                                     if(peer_bits.get(peerID).equals(bitfield)){
                                         //bifields are equivalent, not interested
-
                                         peer_interest.remove(peer_interest.indexOf(peerID));
                                         choked = true;
                                     }else {
@@ -837,6 +920,10 @@ public class Peer2 {
                 h.sendMessage(msg);
             }
             System.out.println("Done");
+        }
+
+        public int myPartner() {
+            return peerID;
         }
     }
 }
