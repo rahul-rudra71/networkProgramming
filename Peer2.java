@@ -57,6 +57,9 @@ public class Peer2 {
         //This block of code reads in the peer info file, splits each line into a list of string arrays, determines peers with lower ids
         int sPort = 0;
         int hasFile = 0;
+		if(args[0] != null)
+            myID = Integer.parseInt(args[0]);
+		  System.out.println("myID: " + myID);
         List<String[]> peerList = new ArrayList<String[]>();
         try {
             File myObj = new File("PeerInfo.cfg");
